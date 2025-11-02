@@ -129,15 +129,28 @@ function renderResults(matches: SearchMatch[]) {
   fileGroups.forEach((fileMatches, filePath) => {
     const fileName = fileMatches[0].file_name;
     const zoteroLink = fileMatches[0].zotero_link;
+    const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
 
     html += `
       <div class="result-file">
         <div class="result-file-header">
-          <h3>${fileName}</h3>
-          <div class="result-file-path">${filePath}</div>
-          ${zoteroLink ? `<div class="zotero-link"><a href="${escapeHtml(zoteroLink)}"">📚 ${escapeHtml(zoteroLink)}</a></div>` : ''}
+          <div class="result-file-header-content">
+            <div class="result-file-header-title">
+              <h3>${fileName}</h3>
+              <div class="result-file-header-buttons">
+                <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
+                <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
+                  <span>Matches (${fileMatches.length})</span>
+                  <span class="result-matches-toggle-arrow">▼</span>
+                </button>
+              </div>
+            </div>
+            <div class="result-file-path">${filePath}</div>
+            ${zoteroLink ? `<div class="zotero-link"><a href="${escapeHtml(zoteroLink)}">📚 ${escapeHtml(zoteroLink)}</a></div>` : ''}
+          </div>
         </div>
-        <div class="result-matches">
+        ${showPages.checked ? `<div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>` : ''}
+        <div class="result-matches" id="matches-${fileId}">
     `;
 
     if (!showPages.checked) {
@@ -166,7 +179,7 @@ function renderResults(matches: SearchMatch[]) {
 
       // Render each page once with all its matches
       pageGroups.forEach((pageMatches, pageNumber) => {
-        const pageId = `page-${filePath.replace(/[^a-zA-Z0-9]/g, '_')}-${pageNumber}`;
+        const pageId = `page-${fileId}-${pageNumber}`;
         html += `
           <div class="result-match">
             <div class="result-match-header">Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})</div>
@@ -186,47 +199,110 @@ function renderResults(matches: SearchMatch[]) {
 
   resultsContainer.innerHTML = html;
 
-  // Load page images if "Show Pages" is enabled
-  if (showPages.checked) {
-    const query = searchQuery.value.trim();
-
-    fileGroups.forEach((fileMatches, filePath) => {
-      // Group by page
-      const pageGroups = new Map<number, SearchMatch[]>();
-      fileMatches.forEach(match => {
-        if (!pageGroups.has(match.page_number)) {
-          pageGroups.set(match.page_number, []);
-        }
-        pageGroups.get(match.page_number)!.push(match);
-      });
-
-      // Load each unique page once
-      pageGroups.forEach((_pageMatches, pageNumber) => {
-        const pageId = `page-${filePath.replace(/[^a-zA-Z0-9]/g, '_')}-${pageNumber}`;
-
-        loadPageImage(filePath, pageNumber, query)
-          .then(canvas => {
-            const element = document.getElementById(pageId);
-            if (element) {
-              element.innerHTML = '';
-              element.appendChild(canvas);
-            }
-          })
-          .catch(() => {
-            const element = document.getElementById(pageId);
-            if (element) {
-              element.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
-            }
-          });
-      });
+  // Set up event listeners for show cover buttons
+  document.querySelectorAll('.show-cover-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const filePath = (btn as HTMLButtonElement).dataset.filepath;
+      if (filePath) {
+        toggleCoverPage(filePath, btn as HTMLButtonElement);
+      }
     });
-  }
+  });
+
+  // Set up event listeners for accordion toggles
+  document.querySelectorAll('.result-matches-toggle').forEach(toggle => {
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      const fileId = (toggle as HTMLElement).dataset.fileid;
+      const matchesContainer = document.getElementById(`matches-${fileId}`);
+      const arrow = toggle.querySelector('.result-matches-toggle-arrow');
+
+      if (matchesContainer && arrow) {
+        const isOpen = matchesContainer.classList.contains('open');
+
+        if (!isOpen) {
+          // Opening - load pages if needed
+          matchesContainer.classList.add('open');
+          arrow.classList.add('open');
+
+          // Load pages if "Show Pages" is enabled
+          if (showPages.checked) {
+            const query = searchQuery.value.trim();
+            const pageElements = matchesContainer.querySelectorAll('.page-preview');
+            pageElements.forEach((pageElement) => {
+              const pageId = pageElement.id;
+              const match = pageId.match(/page-(.+)-(\d+)$/);
+              if (match) {
+                const filePathKey = match[1];
+                const pageNumber = parseInt(match[2]);
+
+                // Find the actual file path from fileGroups
+                for (const [filePath] of fileGroups.entries()) {
+                  if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
+                    loadPageImage(filePath, pageNumber, query)
+                      .then(canvas => {
+                        if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
+                          pageElement.innerHTML = '';
+                          pageElement.appendChild(canvas);
+                        }
+                      })
+                      .catch(() => {
+                        pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                      });
+                    break;
+                  }
+                }
+              }
+            });
+          }
+        } else {
+          // Closing
+          matchesContainer.classList.remove('open');
+          arrow.classList.remove('open');
+        }
+      }
+    });
+  });
 }
 
 function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {
+  const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
+  const coverContainer = document.getElementById(`cover-${fileId}`);
+
+  if (!coverContainer) return;
+
+  const isVisible = coverContainer.style.display !== 'none';
+
+  if (isVisible) {
+    // Hide the cover
+    coverContainer.style.display = 'none';
+    button.style.opacity = '0.7';
+  } else {
+    // Show the cover
+    coverContainer.style.display = 'flex';
+
+    // Check if already loaded
+    if (!coverContainer.querySelector('canvas') && !coverContainer.querySelector('img')) {
+      coverContainer.innerHTML = '<div class="loading">Loading cover page...</div>';
+
+      try {
+        const canvas = await loadPageImage(filePath, 1, '');
+        coverContainer.innerHTML = '';
+        coverContainer.appendChild(canvas);
+      } catch {
+        coverContainer.innerHTML = '<div class="page-preview-error">Failed to load cover page</div>';
+      }
+    }
+
+    button.style.opacity = '1';
+  }
 }
 
 async function loadPageImage(filePath: string, pageNumber: number, searchQuery: string): Promise<HTMLCanvasElement> {
@@ -266,36 +342,39 @@ async function loadPageImage(filePath: string, pageNumber: number, searchQuery: 
     const textContent = await page.getTextContent();
 
     // Highlight search terms (draw rectangles over matches)
-    context.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow highlight
-    const searchLower = searchQuery.toLowerCase();
+    // Skip highlighting if search query is empty (e.g., for cover pages)
+    if (searchQuery.trim().length > 0) {
+      context.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow highlight
+      const searchLower = searchQuery.toLowerCase();
 
-    for (const item of textContent.items) {
-      if ('str' in item && item.str.toLowerCase().includes(searchLower)) {
-        // Get the transform matrix [a, b, c, d, e, f]
-        const tx = item.transform;
+      for (const item of textContent.items) {
+        if ('str' in item && item.str.toLowerCase().includes(searchLower)) {
+          // Get the transform matrix [a, b, c, d, e, f]
+          const tx = item.transform;
 
-        // Calculate the bounding box in PDF coordinates
-        // The transform gives us position and scale
-        const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
-        const fontWidth = item.width;
+          // Calculate the bounding box in PDF coordinates
+          // The transform gives us position and scale
+          const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
+          const fontWidth = item.width;
 
-        // Convert PDF coordinates to viewport coordinates
-        const left = tx[4];
-        const bottom = tx[5];
-        const right = left + fontWidth;
-        const top = bottom + fontHeight;
+          // Convert PDF coordinates to viewport coordinates
+          const left = tx[4];
+          const bottom = tx[5];
+          const right = left + fontWidth;
+          const top = bottom + fontHeight;
 
-        // Transform to viewport space
-        const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
-        const [x2, y2] = viewport.convertToViewportPoint(right, top);
+          // Transform to viewport space
+          const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
+          const [x2, y2] = viewport.convertToViewportPoint(right, top);
 
-        // Draw the highlight rectangle
-        const rectX = Math.min(x1, x2);
-        const rectY = Math.min(y1, y2);
-        const rectWidth = Math.abs(x2 - x1);
-        const rectHeight = Math.abs(y2 - y1);
+          // Draw the highlight rectangle
+          const rectX = Math.min(x1, x2);
+          const rectY = Math.min(y1, y2);
+          const rectWidth = Math.abs(x2 - x1);
+          const rectHeight = Math.abs(y2 - y1);
 
-        context.fillRect(rectX, rectY, rectWidth, rectHeight);
+          context.fillRect(rectX, rectY, rectWidth, rectHeight);
+        }
       }
     }
 
