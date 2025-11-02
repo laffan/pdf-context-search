@@ -194,9 +194,12 @@ function renderResults(matches: SearchMatch[]) {
     if (!showPages.checked) {
       // Show text context for each match
       fileMatches.forEach((match) => {
+        const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+          ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${match.page_number}">Page ${match.page_number}</a>`
+          : `Page ${match.page_number}`;
         html += `
           <div class="result-match">
-            <div class="result-match-header">Page ${match.page_number}</div>
+            <div class="result-match-header">${pageHeader}</div>
             <div class="result-match-context">
               ...${escapeHtml(match.context_before)}
               <span class="match-highlight">${escapeHtml(match.matched_text)}</span>
@@ -218,9 +221,12 @@ function renderResults(matches: SearchMatch[]) {
       // Render each page once with all its matches
       pageGroups.forEach((pageMatches, pageNumber) => {
         const pageId = `page-${fileId}-${pageNumber}`;
+        const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+          ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+          : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
         html += `
           <div class="result-match">
-            <div class="result-match-header">Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})</div>
+            <div class="result-match-header">${pageHeader}</div>
             <div class="page-preview" id="${pageId}">
               <div class="page-preview-loading">Loading page preview...</div>
             </div>
@@ -268,6 +274,19 @@ function renderResults(matches: SearchMatch[]) {
       const page = (btn as HTMLButtonElement).dataset.page;
       if (attachmentKey) {
         openInZotero(attachmentKey, parseInt(page || '1'), btn as HTMLButtonElement);
+      }
+    });
+  });
+
+  // Set up event listeners for page links
+  document.querySelectorAll('.page-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const attachmentKey = (link as HTMLAnchorElement).dataset.attachmentKey;
+      const page = (link as HTMLAnchorElement).dataset.page;
+      if (attachmentKey && page) {
+        openInZotero(attachmentKey, parseInt(page), link as HTMLAnchorElement);
       }
     });
   });
@@ -352,7 +371,7 @@ function copyCitation(citekey: string, link: string, button: HTMLButtonElement) 
   });
 }
 
-async function openInZotero(attachmentKey: string, pageNumber: number, button: HTMLButtonElement) {
+async function openInZotero(attachmentKey: string, pageNumber: number, element: HTMLButtonElement | HTMLAnchorElement) {
   // Generate the zotero:// URL for opening the PDF at a specific page
   const zoteroUrl = `zotero://open-pdf/library/items/${attachmentKey}?page=${pageNumber}`;
 
@@ -361,13 +380,13 @@ async function openInZotero(attachmentKey: string, pageNumber: number, button: H
     await invoke('plugin:opener|open_url', { url: zoteroUrl });
 
     // Show success feedback
-    const originalText = button.textContent;
-    button.textContent = '✓ Opened';
-    button.style.opacity = '0.7';
+    const originalText = element.textContent;
+    element.textContent = '✓ Opened';
+    element.style.opacity = '0.7';
 
     setTimeout(() => {
-      button.textContent = originalText;
-      button.style.opacity = '1';
+      element.textContent = originalText;
+      element.style.opacity = '1';
     }, 2000);
   } catch (error) {
     showStatus(`Failed to open in Zotero: ${error}`, 'error');

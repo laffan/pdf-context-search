@@ -462,6 +462,18 @@ body {
   font-weight: 500;
 }
 
+.result-match-header .page-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.result-match-header .page-link:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
 .result-match-context {
   font-size: 14px;
   line-height: 1.6;
