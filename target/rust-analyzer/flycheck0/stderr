@@ -1,0 +1,243 @@
+   0.168491458s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf_search_gui_lib"}: cargo::core::compiler::fingerprint: fingerprint error for pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("pdf_search_gui_lib", ["staticlib", "cdylib", "rlib"], "/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/src/lib.rs", Edition2021) }
+   0.169008291s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf_search_gui_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/pdf-search-gui-ad552fe3e9094d02/lib-pdf_search_gui_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.180134916s  INFO prepare_target{force=false package_id=lopdf v0.32.0 target="lopdf"}: cargo::core::compiler::fingerprint: fingerprint error for lopdf v0.32.0/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("lopdf", ["lib"], "/Users/nate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lopdf-0.32.0/src/lib.rs", Edition2021) }
+   0.180146125s  INFO prepare_target{force=false package_id=lopdf v0.32.0 target="lopdf"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/lopdf-cb348d1ee6c3dfb7/lib-lopdf`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.180747166s  INFO prepare_target{force=false package_id=chrono v0.4.42 target="chrono"}: cargo::core::compiler::fingerprint: fingerprint error for chrono v0.4.42/Check { test: false }/TargetInner { ..: lib_target("chrono", ["lib"], "/Users/nate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/chrono-0.4.42/src/lib.rs", Edition2021) }
+   0.180753375s  INFO prepare_target{force=false package_id=chrono v0.4.42 target="chrono"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/chrono-2c6dcd214c3fc65f/lib-chrono`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: cargo::core::compiler::compile
+   9: <cargo::core::compiler::build_runner::BuildRunner>::compile
+  10: cargo::ops::cargo_compile::compile_ws
+  11: cargo::ops::cargo_compile::compile_with_exec
+  12: cargo::ops::cargo_compile::compile
+  13: cargo::commands::check::exec
+  14: <cargo::cli::Exec>::exec
+  15: cargo::main
+  16: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  17: std::rt::lang_start::<()>::{closure#0}
+  18: std::rt::lang_start_internal
+  19: _main
+   0.181216208s  INFO prepare_target{force=false package_id=num-traits v0.2.19 target="num_traits"}: cargo::core::compiler::fingerprint: fingerprint error for num-traits v0.2.19/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("num_traits", ["lib"], "/Users/nate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-traits-0.2.19/src/lib.rs", Edition2021) }
+   0.181221208s  INFO prepare_target{force=false package_id=num-traits v0.2.19 target="num_traits"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/num-traits-e26c5a2f6d526129/lib-num_traits`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: cargo::core::compiler::compile
+   9: cargo::core::compiler::compile
+  10: <cargo::core::compiler::build_runner::BuildRunner>::compile
+  11: cargo::ops::cargo_compile::compile_ws
+  12: cargo::ops::cargo_compile::compile_with_exec
+  13: cargo::ops::cargo_compile::compile
+  14: cargo::commands::check::exec
+  15: <cargo::cli::Exec>::exec
+  16: cargo::main
+  17: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  18: std::rt::lang_start::<()>::{closure#0}
+  19: std::rt::lang_start_internal
+  20: _main
+   0.183271541s  INFO prepare_target{force=false package_id=rayon v1.11.0 target="rayon"}: cargo::core::compiler::fingerprint: fingerprint error for rayon v1.11.0/Check { test: false }/TargetInner { ..: lib_target("rayon", ["lib"], "/Users/nate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rayon-1.11.0/src/lib.rs", Edition2021) }
+   0.183276416s  INFO prepare_target{force=false package_id=rayon v1.11.0 target="rayon"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/rayon-fcbe85810f5e1e33/lib-rayon`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: cargo::core::compiler::compile
+   9: <cargo::core::compiler::build_runner::BuildRunner>::compile
+  10: cargo::ops::cargo_compile::compile_ws
+  11: cargo::ops::cargo_compile::compile_with_exec
+  12: cargo::ops::cargo_compile::compile
+  13: cargo::commands::check::exec
+  14: <cargo::cli::Exec>::exec
+  15: cargo::main
+  16: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  17: std::rt::lang_start::<()>::{closure#0}
+  18: std::rt::lang_start_internal
+  19: _main
+   0.183441500s  INFO prepare_target{force=false package_id=either v1.15.0 target="either"}: cargo::core::compiler::fingerprint: fingerprint error for either v1.15.0/Check { test: false }/TargetInner { ..: lib_target("either", ["lib"], "/Users/nate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/either-1.15.0/src/lib.rs", Edition2021) }
+   0.183445333s  INFO prepare_target{force=false package_id=either v1.15.0 target="either"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/either-e615794d80ba5a1b/lib-either`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: cargo::core::compiler::compile
+   9: cargo::core::compiler::compile
+  10: <cargo::core::compiler::build_runner::BuildRunner>::compile
+  11: cargo::ops::cargo_compile::compile_ws
+  12: cargo::ops::cargo_compile::compile_with_exec
+  13: cargo::ops::cargo_compile::compile
+  14: cargo::commands::check::exec
+  15: <cargo::cli::Exec>::exec
+  16: cargo::main
+  17: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  18: std::rt::lang_start::<()>::{closure#0}
+  19: std::rt::lang_start_internal
+  20: _main
+   0.207852708s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf_search_gui_lib"}: cargo::core::compiler::fingerprint: fingerprint error for pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri)/Check { test: true }/TargetInner { ..: lib_target("pdf_search_gui_lib", ["staticlib", "cdylib", "rlib"], "/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/src/lib.rs", Edition2021) }
+   0.207865708s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf_search_gui_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/pdf-search-gui-c45d3f7c32f467ed/test-lib-pdf_search_gui_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.208817500s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf-search-gui"}: cargo::core::compiler::fingerprint: fingerprint error for pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri)/Check { test: false }/TargetInner { name: "pdf-search-gui", doc: true, ..: with_path("/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/src/main.rs", Edition2021) }
+   0.208824625s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf-search-gui"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/pdf-search-gui-d4f52b065eb65fbc/bin-pdf-search-gui`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.209603750s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf-search-gui"}: cargo::core::compiler::fingerprint: fingerprint error for pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri)/Check { test: true }/TargetInner { name: "pdf-search-gui", doc: true, ..: with_path("/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/src/main.rs", Edition2021) }
+   0.209608208s  INFO prepare_target{force=false package_id=pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri) target="pdf-search-gui"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri/target/debug/.fingerprint/pdf-search-gui-efcbd75b9d492980/test-bin-pdf-search-gui`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+    Checking num-traits v0.2.19
+    Checking either v1.15.0
+    Checking rayon v1.11.0
+    Checking chrono v0.4.42
+    Checking lopdf v0.32.0
+    Checking pdf-search-gui v0.1.0 (/Users/nate/Documents/github/pdf-search-tool/pdf-search-gui/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.29s

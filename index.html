@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Search Tool</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <h1>PDF Search</h1>
+
+        <form id="search-form">
+          <div class="form-group">
+            <label for="search-query">Search Query</label>
+            <input
+              type="text"
+              id="search-query"
+              placeholder="Enter search term..."
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="directory-path">Directory</label>
+            <div class="directory-picker">
+              <input
+                type="text"
+                id="directory-path"
+                placeholder="Select directory..."
+                readonly
+                required
+              />
+              <button type="button" id="browse-btn">Browse</button>
+            </div>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="case-sensitive" />
+              Case Sensitive
+            </label>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="use-regex" />
+              Use Regex
+            </label>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="show-pages" checked />
+              Show Pages
+            </label>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="zotero-mode" />
+              Zotero Mode
+            </label>
+          </div>
+
+          <div class="form-group" id="zotero-folder-group" style="display: none;">
+            <label for="zotero-path">Zotero Data Directory</label>
+            <div class="directory-picker">
+              <input
+                type="text"
+                id="zotero-path"
+                placeholder="Select Zotero data directory..."
+                readonly
+              />
+              <button type="button" id="browse-zotero-btn">Browse</button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" id="search-btn">
+            Search
+          </button>
+
+          <button type="button" class="btn-secondary" id="export-btn" disabled>
+            Export to Markdown
+          </button>
+        </form>
+
+        <div id="status-message"></div>
+      </aside>
+
+      <!-- Main Panel -->
+      <main class="main-panel">
+        <div class="results-header">
+          <h2>Search Results</h2>
+          <span id="results-count" class="results-count"></span>
+        </div>
+
+        <div id="results-container" class="results-container">
+          <div class="empty-state">
+            <p>Enter a search query and select a directory to begin</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
