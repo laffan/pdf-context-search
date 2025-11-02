@@ -126,20 +126,26 @@ fn search_in_page(
     let mut matches = Vec::new();
     let words = split_into_words(page_text);
 
+    // Remove spaces from query to handle multi-word searches in PDFs without spaces
+    let query_no_spaces = query.replace(" ", "");
+
     if use_regex {
         let pattern = if case_sensitive {
-            Regex::new(query)?
+            Regex::new(&query_no_spaces)?
         } else {
-            Regex::new(&format!("(?i){}", query))?
+            Regex::new(&format!("(?i){}", query_no_spaces))?
         };
 
-        for regex_match in pattern.find_iter(page_text) {
+        // Create a version of page_text without spaces for matching
+        let page_text_no_spaces = page_text.replace(" ", "");
+
+        for regex_match in pattern.find_iter(&page_text_no_spaces) {
             let match_start = regex_match.start();
             let match_end = regex_match.end();
             let matched_text = regex_match.as_str().to_string();
 
-            let before_text = &page_text[..match_start];
-            let after_text = &page_text[match_end..];
+            let before_text = &page_text_no_spaces[..match_start];
+            let after_text = &page_text_no_spaces[match_end..];
 
             let before_words: Vec<String> = split_into_words(before_text);
             let after_words: Vec<String> = split_into_words(after_text);
@@ -164,9 +170,9 @@ fn search_in_page(
         }
     } else {
         let search_query = if case_sensitive {
-            query.to_string()
+            query_no_spaces.clone()
         } else {
-            query.to_lowercase()
+            query_no_spaces.to_lowercase()
         };
 
         for (i, word) in words.iter().enumerate() {
