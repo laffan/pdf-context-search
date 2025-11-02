@@ -8,6 +8,14 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 // Set up PDF.js worker - use local worker file instead of CDN
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+interface ZoteroMetadata {
+  citekey: string;
+  title: string | null;
+  year: string | null;
+  authors: string | null;
+  zotero_link: string;
+}
+
 interface SearchMatch {
   file_path: string;
   file_name: string;
@@ -16,6 +24,7 @@ interface SearchMatch {
   matched_text: string;
   context_after: string;
   zotero_link: string | null;
+  zotero_metadata: ZoteroMetadata | null;
 }
 
 interface SearchParams {
@@ -131,22 +140,36 @@ function renderResults(matches: SearchMatch[]) {
     const zoteroLink = fileMatches[0].zotero_link;
     const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
 
+    const firstMatch = fileMatches[0];
+    const zoteroMetadata = firstMatch.zotero_metadata;
+
     html += `
       <div class="result-file">
         <div class="result-file-header">
           <div class="result-file-header-content">
             <div class="result-file-header-title">
-              <h3>${fileName}</h3>
+              ${zoteroMetadata ? `
+                <div class="zotero-header">
+                  <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
+                  ${zoteroMetadata.year || zoteroMetadata.authors ? `
+                    <div class="zotero-authors-year">
+                      ${zoteroMetadata.year ? escapeHtml(zoteroMetadata.year) : ''}
+                      ${zoteroMetadata.authors ? `- ${escapeHtml(zoteroMetadata.authors)}` : ''}
+                    </div>
+                  ` : ''}
+                </div>
+              ` : `<h3>${fileName}</h3>`}
               <div class="result-file-header-buttons">
                 <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
                   <span>Matches (${fileMatches.length})</span>
                   <span class="result-matches-toggle-arrow">▼</span>
                 </button>
+                ${zoteroMetadata ? `<button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Citation</button>` : ''}
+                ${zoteroMetadata ? `<button class="btn-icon copy-zotero-link-btn" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">🔗 Link</button>` : ''}
               </div>
             </div>
-            <div class="result-file-path">${filePath}</div>
-            ${zoteroLink ? `<div class="zotero-link"><a href="${escapeHtml(zoteroLink)}">📚 ${escapeHtml(zoteroLink)}</a></div>` : ''}
+            ${!zoteroMetadata ? `<div class="result-file-path">${filePath}</div>` : ''}
           </div>
         </div>
         ${showPages.checked ? `<div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>` : ''}
@@ -206,6 +229,29 @@ function renderResults(matches: SearchMatch[]) {
       const filePath = (btn as HTMLButtonElement).dataset.filepath;
       if (filePath) {
         toggleCoverPage(filePath, btn as HTMLButtonElement);
+      }
+    });
+  });
+
+  // Set up event listeners for copy citation buttons
+  document.querySelectorAll('.copy-citation-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const citekey = (btn as HTMLButtonElement).dataset.citekey;
+      const link = (btn as HTMLButtonElement).dataset.link;
+      if (citekey && link) {
+        copyCitation(citekey, link, btn as HTMLButtonElement);
+      }
+    });
+  });
+
+  // Set up event listeners for copy zotero link buttons
+  document.querySelectorAll('.copy-zotero-link-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const link = (btn as HTMLButtonElement).dataset.link;
+      if (link) {
+        copyZoteroLink(link, btn as HTMLButtonElement);
       }
     });
   });
@@ -270,6 +316,40 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function copyCitation(citekey: string, link: string, button: HTMLButtonElement) {
+  const citation = `[@${citekey}](${link})`;
+
+  navigator.clipboard.writeText(citation).then(() => {
+    // Show success feedback
+    const originalText = button.textContent;
+    button.textContent = '✓ Copied';
+    button.style.opacity = '0.7';
+
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.style.opacity = '1';
+    }, 2000);
+  }).catch(() => {
+    showStatus('Failed to copy citation to clipboard', 'error');
+  });
+}
+
+function copyZoteroLink(link: string, button: HTMLButtonElement) {
+  navigator.clipboard.writeText(link).then(() => {
+    // Show success feedback
+    const originalText = button.textContent;
+    button.textContent = '✓ Copied';
+    button.style.opacity = '0.7';
+
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.style.opacity = '1';
+    }, 2000);
+  }).catch(() => {
+    showStatus('Failed to copy link to clipboard', 'error');
+  });
 }
 
 async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {

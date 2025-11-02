@@ -279,6 +279,20 @@ body {
   flex: 1;
 }
 
+.zotero-header {
+  flex: 1;
+}
+
+.zotero-header h3 {
+  margin-bottom: 4px;
+}
+
+.zotero-authors-year {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .result-file-header-buttons {
   display: flex;
   gap: 8px;
@@ -337,6 +351,29 @@ body {
   text-decoration: underline;
 }
 
+.zotero-link-actions {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.zotero-link-actions a {
+  color: var(--primary-color);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: var(--background);
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.zotero-link-actions a:hover {
+  background-color: var(--border-color);
+  text-decoration: underline;
+}
+
 .cover-page-container {
   background-color: var(--surface);
   border: 1px solid var(--border-color);
@@ -344,13 +381,23 @@ body {
   padding: 16px;
   display: flex;
   justify-content: center;
+  align-items: center;
   position: relative;
-  z-index: 20;
+  z-index: 5;
+  overflow: auto;
 }
 
 .cover-page-container.loading {
   padding: 32px 16px;
   color: var(--text-secondary);
+}
+
+.cover-page-container canvas,
+.cover-page-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .result-matches-toggle {

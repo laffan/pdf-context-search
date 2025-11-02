@@ -9,6 +9,15 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZoteroMetadata {
+    pub citekey: String,
+    pub title: Option<String>,
+    pub year: Option<String>,
+    pub authors: Option<String>,
+    pub zotero_link: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchMatch {
     pub file_path: String,
     pub file_name: String,
@@ -17,6 +26,7 @@ pub struct SearchMatch {
     pub matched_text: String,
     pub context_after: String,
     pub zotero_link: Option<String>,
+    pub zotero_metadata: Option<ZoteroMetadata>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,8 +56,8 @@ pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
     Ok(pdf_files)
 }
 
-// Build a map of PDF filenames to Zotero item keys
-fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, String>> {
+// Build a map of PDF filenames to Zotero metadata
+fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata>> {
     let db_path = zotero_path.join("zotero.sqlite");
 
     if !db_path.exists() {
@@ -57,8 +67,9 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, String>> {
     let conn = Connection::open(&db_path)
         .context("Failed to open Zotero database")?;
 
+    // First, query to get basic item info and attachment paths
     let mut stmt = conn.prepare(
-        "SELECT items.key, itemAttachments.path
+        "SELECT items.itemID, items.key, itemAttachments.path
          FROM items
          JOIN itemAttachments ON items.itemID = itemAttachments.itemID
          WHERE itemAttachments.path IS NOT NULL"
@@ -67,13 +78,14 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, String>> {
     let mut map = HashMap::new();
     let rows = stmt.query_map([], |row| {
         Ok((
-            row.get::<_, String>(0)?, // item key
-            row.get::<_, String>(1)?, // attachment path
+            row.get::<_, i32>(0)?,      // itemID
+            row.get::<_, String>(1)?,   // item key (citekey)
+            row.get::<_, String>(2)?,   // attachment path
         ))
     })?;
 
     for row in rows {
-        if let Ok((key, path)) = row {
+        if let Ok((item_id, item_key, path)) = row {
             // Extract filename from path (could be "storage:filename.pdf" or just "filename.pdf")
             let filename = if let Some(colon_pos) = path.rfind(':') {
                 &path[colon_pos + 1..]
@@ -81,11 +93,92 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, String>> {
                 path.rsplit('/').next().unwrap_or(&path)
             };
 
-            map.insert(filename.to_string(), key);
+            // Query for title, year, and creators
+            let title = get_item_field(&conn, item_id, "title").ok().flatten();
+            let year = get_item_field(&conn, item_id, "year").ok().flatten();
+            let authors = get_item_creators(&conn, item_id).ok().flatten();
+
+            // Try to get the BibTeX citation key from the extra field
+            let bibtex_citekey = extract_bibtex_citekey(
+                &get_item_field(&conn, item_id, "extra").ok().flatten()
+            );
+            let citekey = bibtex_citekey.unwrap_or_else(|| item_key.clone());
+
+            map.insert(
+                filename.to_string(),
+                ZoteroMetadata {
+                    citekey: citekey.clone(),
+                    title,
+                    year,
+                    authors,
+                    zotero_link: format!("zotero://select/library/items/{}", item_key),
+                },
+            );
         }
     }
 
     Ok(map)
+}
+
+// Helper function to get item field value by field name
+fn get_item_field(conn: &Connection, item_id: i32, field_name: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT itemDataValues.value
+         FROM itemData
+         JOIN fields ON itemData.fieldID = fields.fieldID
+         JOIN itemDataValues ON itemData.valueID = itemDataValues.valueID
+         WHERE itemData.itemID = ? AND fields.fieldName = ?"
+    )?;
+
+    let value = stmt.query_row([item_id.to_string(), field_name.to_string()], |row| {
+        row.get::<_, String>(0)
+    }).ok();
+
+    Ok(value)
+}
+
+// Helper function to get item creators (authors)
+fn get_item_creators(conn: &Connection, item_id: i32) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT creators.name
+         FROM creators
+         JOIN itemCreators ON creators.creatorID = itemCreators.creatorID
+         WHERE itemCreators.itemID = ?
+         ORDER BY itemCreators.orderIndex"
+    )?;
+
+    let mut creators = Vec::new();
+    let rows = stmt.query_map([item_id], |row| {
+        row.get::<_, String>(0)
+    })?;
+
+    for row in rows {
+        if let Ok(creator) = row {
+            creators.push(creator);
+        }
+    }
+
+    if creators.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(creators.join(", ")))
+    }
+}
+
+// Helper function to extract BibTeX citation key from the extra field
+// Zotero stores citation keys in the format: "Citation Key: coraiola2023"
+fn extract_bibtex_citekey(extra: &Option<String>) -> Option<String> {
+    if let Some(extra_text) = extra {
+        // Look for "Citation Key: " pattern (case-insensitive)
+        if let Some(start_pos) = extra_text.to_lowercase().find("citation key:") {
+            let after_label = &extra_text[start_pos + 13..]; // Skip past "citation key:"
+            let key = after_label.trim().split_whitespace().next()?;
+            if !key.is_empty() {
+                return Some(key.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
@@ -204,21 +297,25 @@ fn search_pdf(
     context_words: usize,
     case_sensitive: bool,
     use_regex: bool,
-    zotero_map: Option<&HashMap<String, String>>,
+    zotero_map: Option<&HashMap<String, ZoteroMetadata>>,
 ) -> Result<Vec<SearchMatch>> {
     let pages = extract_text_from_pdf(pdf_path)?;
     let mut results = Vec::new();
 
-    // Get filename and lookup Zotero key if available
+    // Get filename and lookup Zotero metadata if available
     let file_name = pdf_path
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
 
-    let zotero_link = zotero_map
+    let (zotero_link, zotero_metadata) = zotero_map
         .and_then(|map| map.get(&file_name))
-        .map(|key| format!("zotero://select/library/items/{}", key));
+        .map(|metadata| (
+            Some(metadata.zotero_link.clone()),
+            Some(metadata.clone()),
+        ))
+        .unwrap_or((None, None));
 
     for (page_num, page_text) in pages {
         let matches = search_in_page(&page_text, query, context_words, case_sensitive, use_regex)?;
@@ -232,6 +329,7 @@ fn search_pdf(
                 matched_text,
                 context_after,
                 zotero_link: zotero_link.clone(),
+                zotero_metadata: zotero_metadata.clone(),
             });
         }
     }

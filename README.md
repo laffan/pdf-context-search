@@ -6,16 +6,23 @@ A modern desktop application built with Tauri v2 for searching text across multi
 
 - **Modern UI**: Clean sidebar + main panel layout with dark mode support
 - **Fast Search**: Rust-powered backend with parallel PDF processing
-- **Visual Results**: Grouped results by file with highlighted matches
+- **Visual Results**: Grouped results by file with sticky headers and accordion expansion
+- **Multi-Word Search**: Search for phrases across PDFs where spaces are stripped
 - **PDF Page Preview**: Renders actual PDF pages with search terms highlighted (using PDF.js)
+- **Cover Page Display**: Toggle to view the first page of any PDF with one click
 - **Context Display**: Configurable words before/after matches (when page preview is off)
 - **Directory Picker**: Native file browser for selecting PDF directories
 - **Export**: Save results to Markdown format
+- **Zotero Integration**: In Zotero mode, extracts and displays:
+  - Title, year, and authors from Zotero database
+  - Copy-to-clipboard citation formatting: `[@citekey](zotero://link)`
+  - Direct Zotero item links that open in your Zotero client
 - **Search Options**:
   - Case-sensitive search
   - Regex pattern matching
   - Adjustable context words (10-500)
   - Show Pages toggle (renders pages with highlights)
+  - Optional Zotero database integration
 
 ## Tech Stack
 
@@ -80,14 +87,21 @@ The compiled app will be in `src-tauri/target/release/bundle/`.
 
 ## Usage
 
-1. **Enter Search Query**: Type the text or regex pattern to search for
+1. **Enter Search Query**: Type the text or regex pattern to search for (multi-word searches supported)
 2. **Select Directory**: Click "Browse" to choose a folder containing PDFs
 3. **Configure Options** (optional):
    - Adjust context words (default: 100)
    - Enable case-sensitive search
    - Enable regex mode for pattern matching
+   - Enable "Show Pages" to render PDF pages with highlighted matches
+   - Enable Zotero mode and select your Zotero data directory for enhanced metadata
 4. **Search**: Click the "Search" button
-5. **View Results**: Matches appear grouped by file in the main panel
+5. **View Results**:
+   - Results appear grouped by file with sticky headers
+   - Click "Matches (N)" to expand/collapse match details (lazy-loads pages if needed)
+   - Click "📖 Cover" to toggle display of the PDF's first page
+   - In Zotero mode, click "📋 Citation" to copy formatted citation to clipboard
+   - Click "🔗 Zotero Link" to open the item in your Zotero client
 6. **Export** (optional): Click "Export to Markdown" to save results
 
 ## How It Works
@@ -119,15 +133,54 @@ search_pdf_files(params: SearchParams) -> Vec<SearchMatch>
 
 // Export results to Markdown file
 export_results_to_markdown(matches: Vec<SearchMatch>, output_path: String)
+
+// Read raw PDF file bytes
+read_pdf_file(file_path: String) -> Vec<u8>
 ```
+
+## Recent Improvements (Latest Session)
+
+### UI/UX Enhancements
+- **Sticky Headers**: File headers remain visible at top during scrolling for easy reference
+- **Accordion Results**: Match lists collapse/expand on demand with smooth animations
+- **Lazy Loading**: Pages only render when accordion is expanded, improving initial responsiveness
+- **Full-Width Layout**: Removed unnecessary header bar to maximize result viewing area
+- **Cover Page Toggle**: Single-click access to first page preview without loading all matches
+
+### Search Improvements
+- **Multi-Word Search Support**: Searches work across PDFs where spaces are stripped from text
+  - Query "collective memory" will match "collectivememory" in PDFs
+  - Highlighting still works correctly with original text
+- **Smart Highlighting**: Empty query no longer highlights entire pages (e.g., when viewing cover)
+
+### Zotero Mode Enhancements
+- **Rich Bibliographic Display**: Headers now show:
+  - Article/book title (from Zotero database)
+  - Publication year
+  - Author(s) list in italics
+- **One-Click Citations**: "Citation" button copies formatted markdown citation to clipboard
+  - Format: `[@citekey](zotero://link)`
+  - Instant visual feedback with "✓ Copied" confirmation
+- **Direct Zotero Integration**: Links open items directly in your Zotero client via `zotero://` protocol
+
+### Technical Improvements
+- **Database Queries**: Backend now queries Zotero SQLite for:
+  - itemData and itemDataValues tables for title/year
+  - itemCreators and creators tables for author information
+  - Efficient joins with items and itemAttachments
+- **Performance**: Conditional rendering only includes cover container when "Show Pages" is enabled
 
 ## Styling
 
 The UI features:
-- **Responsive layout**: Sidebar (320px) + flexible main panel
-- **Color scheme**: Modern blue/gray palette
+- **Responsive layout**: Sidebar (320px) + flexible main panel (full width)
+- **Color scheme**: Modern blue/gray palette with semantic colors
 - **Dark mode**: Automatic via `prefers-color-scheme`
 - **Custom CSS variables**: Easy theme customization
+- **Sticky Headers**: File headers with smooth box-shadow stay at top during scroll
+- **Accordion Animations**: `max-height` transitions for smooth expand/collapse
+- **Button Variants**: Icon buttons with hover states and opacity feedback
+- **Zotero Headers**: Specialized layout for title, year/authors, and action buttons
 
 ## Performance
 
@@ -145,15 +198,31 @@ The UI features:
 | Export | Command flag | Button click |
 | Configuration | JSON file | Form inputs |
 
+## Recent Completions
+
+- [x] Multi-word phrase searching
+- [x] Accordion-style result expansion
+- [x] Sticky file headers
+- [x] Cover page preview with toggle
+- [x] Zotero metadata extraction (title, year, authors)
+- [x] Copy-to-clipboard citation formatting
+- [x] Direct Zotero client integration
+- [x] Lazy-loading of PDF previews
+- [x] Smart highlighting (no highlight on empty query)
+- [x] Full-width result layout
+
 ## Future Enhancements
 
 Potential additions:
 - [ ] Search history
 - [ ] Saved search presets
-- [ ] PDF preview pane
 - [ ] Progress bar for long searches
-- [ ] Filter/sort results
+- [ ] Filter/sort results by date, author, or match count
 - [ ] OCR support for scanned PDFs
+- [ ] Batch export to different formats (BibTeX, RIS, etc.)
+- [ ] Advanced search operators (AND, OR, NOT)
+- [ ] Custom highlighting colors
+- [ ] Result annotations/notes
 
 ## Troubleshooting
 
