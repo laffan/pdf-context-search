@@ -16,7 +16,8 @@ A modern desktop application built with Tauri v2 for searching text across multi
 - **Zotero Integration**: In Zotero mode, extracts and displays:
   - Title, year, and authors from Zotero database
   - Copy-to-clipboard citation formatting: `[@citekey](zotero://link)`
-  - Direct Zotero item links that open in your Zotero client
+  - Direct PDF opening in Zotero client with page number navigation
+  - Works even when Zotero is open (uses temporary database copy)
 - **Search Options**:
   - Case-sensitive search
   - Regex pattern matching
@@ -101,7 +102,7 @@ The compiled app will be in `src-tauri/target/release/bundle/`.
    - Click "Matches (N)" to expand/collapse match details (lazy-loads pages if needed)
    - Click "📖 Cover" to toggle display of the PDF's first page
    - In Zotero mode, click "📋 Citation" to copy formatted citation to clipboard
-   - Click "🔗 Zotero Link" to open the item in your Zotero client
+   - Click "📖 Zotero" to open the PDF directly in Zotero at the first match page
 6. **Export** (optional): Click "Export to Markdown" to save results
 
 ## How It Works
@@ -161,7 +162,10 @@ read_pdf_file(file_path: String) -> Vec<u8>
 - **One-Click Citations**: "Citation" button copies formatted markdown citation to clipboard
   - Format: `[@citekey](zotero://link)`
   - Instant visual feedback with "✓ Copied" confirmation
-- **Direct Zotero Integration**: Links open items directly in your Zotero client via `zotero://` protocol
+- **Direct PDF Opening**: "Zotero" button opens the PDF in Zotero client at the specific page
+  - Uses `zotero://open-pdf/library/items/{attachment_key}?page={page_number}` protocol
+  - Opens directly to the first match page in the PDF
+  - No file locking conflicts - creates temporary database copy for reading
 
 ### Technical Improvements
 - **Database Queries**: Backend now queries Zotero SQLite for:

@@ -14,6 +14,7 @@ interface ZoteroMetadata {
   year: string | null;
   authors: string | null;
   zotero_link: string;
+  pdf_attachment_key: string | null;
 }
 
 interface SearchMatch {
@@ -169,7 +170,7 @@ function renderResults(matches: SearchMatch[]) {
                   <span class="result-matches-toggle-arrow">▼</span>
                 </button>
                 <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Citation</button>
-                <button class="btn-icon copy-zotero-link-btn" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">🔗 Link</button>
+                <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
               </div>
             ` : `
               <div class="result-file-header-title">
@@ -259,13 +260,14 @@ function renderResults(matches: SearchMatch[]) {
     });
   });
 
-  // Set up event listeners for copy zotero link buttons
-  document.querySelectorAll('.copy-zotero-link-btn').forEach(btn => {
+  // Set up event listeners for open zotero buttons
+  document.querySelectorAll('.open-zotero-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const link = (btn as HTMLButtonElement).dataset.link;
-      if (link) {
-        copyZoteroLink(link, btn as HTMLButtonElement);
+      const attachmentKey = (btn as HTMLButtonElement).dataset.attachmentKey;
+      const page = (btn as HTMLButtonElement).dataset.page;
+      if (attachmentKey) {
+        openInZotero(attachmentKey, parseInt(page || '1'), btn as HTMLButtonElement);
       }
     });
   });
@@ -350,20 +352,26 @@ function copyCitation(citekey: string, link: string, button: HTMLButtonElement) 
   });
 }
 
-function copyZoteroLink(link: string, button: HTMLButtonElement) {
-  navigator.clipboard.writeText(link).then(() => {
+async function openInZotero(attachmentKey: string, pageNumber: number, button: HTMLButtonElement) {
+  // Generate the zotero:// URL for opening the PDF at a specific page
+  const zoteroUrl = `zotero://open-pdf/library/items/${attachmentKey}?page=${pageNumber}`;
+
+  try {
+    // Use the opener plugin via invoke
+    await invoke('plugin:opener|open_url', { url: zoteroUrl });
+
     // Show success feedback
     const originalText = button.textContent;
-    button.textContent = '✓ Copied';
+    button.textContent = '✓ Opened';
     button.style.opacity = '0.7';
 
     setTimeout(() => {
       button.textContent = originalText;
       button.style.opacity = '1';
     }, 2000);
-  }).catch(() => {
-    showStatus('Failed to copy link to clipboard', 'error');
-  });
+  } catch (error) {
+    showStatus(`Failed to open in Zotero: ${error}`, 'error');
+  }
 }
 
 async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {

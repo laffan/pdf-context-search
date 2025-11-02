@@ -15,6 +15,7 @@ pub struct ZoteroMetadata {
     pub year: Option<String>,
     pub authors: Option<String>,
     pub zotero_link: String,
+    pub pdf_attachment_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,15 +66,25 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata
         return Err(anyhow::anyhow!("Zotero database not found at {:?}", db_path));
     }
 
-    let conn = Connection::open(&db_path)
+    // Create a temporary copy of the Zotero database to avoid file lock issues
+    let temp_dir = std::env::temp_dir();
+    let temp_db_path = temp_dir.join(format!("zotero_temp_{}.sqlite", std::process::id()));
+    std::fs::copy(&db_path, &temp_db_path)
+        .context("Failed to create temporary copy of Zotero database")?;
+
+    let conn = Connection::open(&temp_db_path)
         .context("Failed to open Zotero database")?;
 
-    // Open Better BibTeX database if it exists
-    let bbt_conn = if bbt_db_path.exists() {
-        Some(Connection::open(&bbt_db_path)
-            .context("Failed to open Better BibTeX database")?)
+    // Open Better BibTeX database if it exists (also create temp copy)
+    let (bbt_conn, temp_bbt_db_path) = if bbt_db_path.exists() {
+        let temp_bbt_path = temp_dir.join(format!("better-bibtex_temp_{}.sqlite", std::process::id()));
+        std::fs::copy(&bbt_db_path, &temp_bbt_path)
+            .context("Failed to create temporary copy of Better BibTeX database")?;
+        let conn = Connection::open(&temp_bbt_path)
+            .context("Failed to open Better BibTeX database")?;
+        (Some(conn), Some(temp_bbt_path))
     } else {
-        None
+        (None, None)
     };
 
     // First, query to get basic item info and attachment paths
@@ -106,6 +117,9 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata
                 path.rsplit('/').next().unwrap_or(&path)
             };
 
+            // Store attachment key for later use
+            let pdf_attachment_key = attachment_key.clone();
+
             // Use parent item if available, otherwise use attachment item itself
             let (item_id, item_key) = if let (Some(pid), Some(pkey)) = (parent_id, parent_key) {
                 (pid, pkey)
@@ -135,9 +149,16 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata
                     year,
                     authors,
                     zotero_link: format!("zotero://select/library/items/{}", item_key),
+                    pdf_attachment_key: Some(pdf_attachment_key),
                 },
             );
         }
+    }
+
+    // Clean up temporary database files
+    let _ = std::fs::remove_file(&temp_db_path);
+    if let Some(temp_bbt_path) = temp_bbt_db_path {
+        let _ = std::fs::remove_file(&temp_bbt_path);
     }
 
     Ok(map)
