@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import * as pdfjsLib from 'pdfjs-dist';
 // Import the worker as a URL - Vite will bundle it
 // @ts-expect-error Vite handles ?url imports
@@ -46,7 +46,6 @@ let directoryPath: HTMLInputElement;
 let browseBtn: HTMLButtonElement;
 let caseSensitive: HTMLInputElement;
 let useRegex: HTMLInputElement;
-let showPages: HTMLInputElement;
 let zoteroMode: HTMLInputElement;
 let zoteroPath: HTMLInputElement;
 let browseZoteroBtn: HTMLButtonElement;
@@ -138,7 +137,6 @@ function renderResults(matches: SearchMatch[]) {
   let html = '';
   fileGroups.forEach((fileMatches, filePath) => {
     const fileName = fileMatches[0].file_name;
-    const zoteroLink = fileMatches[0].zotero_link;
     const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
 
     const firstMatch = fileMatches[0];
@@ -187,53 +185,34 @@ function renderResults(matches: SearchMatch[]) {
             `}
           </div>
         </div>
-        ${showPages.checked ? `<div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>` : ''}
+        <div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>
         <div class="result-matches" id="matches-${fileId}">
     `;
 
-    if (!showPages.checked) {
-      // Show text context for each match
-      fileMatches.forEach((match) => {
-        const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
-          ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${match.page_number}">Page ${match.page_number}</a>`
-          : `Page ${match.page_number}`;
-        html += `
-          <div class="result-match">
-            <div class="result-match-header">${pageHeader}</div>
-            <div class="result-match-context">
-              ...${escapeHtml(match.context_before)}
-              <span class="match-highlight">${escapeHtml(match.matched_text)}</span>
-              ${escapeHtml(match.context_after)}...
-            </div>
-          </div>
-        `;
-      });
-    } else {
-      // Group matches by page within this file
-      const pageGroups = new Map<number, SearchMatch[]>();
-      fileMatches.forEach(match => {
-        if (!pageGroups.has(match.page_number)) {
-          pageGroups.set(match.page_number, []);
-        }
-        pageGroups.get(match.page_number)!.push(match);
-      });
+    // Group matches by page within this file
+    const pageGroups = new Map<number, SearchMatch[]>();
+    fileMatches.forEach(match => {
+      if (!pageGroups.has(match.page_number)) {
+        pageGroups.set(match.page_number, []);
+      }
+      pageGroups.get(match.page_number)!.push(match);
+    });
 
-      // Render each page once with all its matches
-      pageGroups.forEach((pageMatches, pageNumber) => {
-        const pageId = `page-${fileId}-${pageNumber}`;
-        const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
-          ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
-          : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
-        html += `
-          <div class="result-match">
-            <div class="result-match-header">${pageHeader}</div>
-            <div class="page-preview" id="${pageId}">
-              <div class="page-preview-loading">Loading page preview...</div>
-            </div>
+    // Render each page once with all its matches
+    pageGroups.forEach((pageMatches, pageNumber) => {
+      const pageId = `page-${fileId}-${pageNumber}`;
+      const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+        ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+        : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
+      html += `
+        <div class="result-match">
+          <div class="result-match-header">${pageHeader}</div>
+          <div class="page-preview" id="${pageId}">
+            <div class="page-preview-loading">Loading page preview...</div>
           </div>
-        `;
-      });
-    }
+        </div>
+      `;
+    });
 
     html += `
         </div>
@@ -303,40 +282,38 @@ function renderResults(matches: SearchMatch[]) {
         const isOpen = matchesContainer.classList.contains('open');
 
         if (!isOpen) {
-          // Opening - load pages if needed
+          // Opening - load pages
           matchesContainer.classList.add('open');
           arrow.classList.add('open');
 
-          // Load pages if "Show Pages" is enabled
-          if (showPages.checked) {
-            const query = searchQuery.value.trim();
-            const pageElements = matchesContainer.querySelectorAll('.page-preview');
-            pageElements.forEach((pageElement) => {
-              const pageId = pageElement.id;
-              const match = pageId.match(/page-(.+)-(\d+)$/);
-              if (match) {
-                const filePathKey = match[1];
-                const pageNumber = parseInt(match[2]);
+          // Load pages
+          const query = searchQuery.value.trim();
+          const pageElements = matchesContainer.querySelectorAll('.page-preview');
+          pageElements.forEach((pageElement) => {
+            const pageId = pageElement.id;
+            const match = pageId.match(/page-(.+)-(\d+)$/);
+            if (match) {
+              const filePathKey = match[1];
+              const pageNumber = parseInt(match[2]);
 
-                // Find the actual file path from fileGroups
-                for (const [filePath] of fileGroups.entries()) {
-                  if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
-                    loadPageImage(filePath, pageNumber, query)
-                      .then(canvas => {
-                        if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
-                          pageElement.innerHTML = '';
-                          pageElement.appendChild(canvas);
-                        }
-                      })
-                      .catch(() => {
-                        pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
-                      });
-                    break;
-                  }
+              // Find the actual file path from fileGroups
+              for (const [filePath] of fileGroups.entries()) {
+                if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
+                  loadPageImage(filePath, pageNumber, query)
+                    .then(canvas => {
+                      if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
+                        pageElement.innerHTML = '';
+                        pageElement.appendChild(canvas);
+                      }
+                    })
+                    .catch(() => {
+                      pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                    });
+                  break;
                 }
               }
-            });
-          }
+            }
+          });
         } else {
           // Closing
           matchesContainer.classList.remove('open');
@@ -573,7 +550,7 @@ async function copyResults() {
 
     // Build markdown output
     let markdown = '';
-    fileGroups.forEach((matches, filePath) => {
+    fileGroups.forEach((matches) => {
       const firstMatch = matches[0];
       const metadata = firstMatch.zotero_metadata;
 
@@ -631,7 +608,6 @@ window.addEventListener("DOMContentLoaded", () => {
   browseBtn = document.querySelector("#browse-btn")!;
   caseSensitive = document.querySelector("#case-sensitive")!;
   useRegex = document.querySelector("#use-regex")!;
-  showPages = document.querySelector("#show-pages")!;
   zoteroMode = document.querySelector("#zotero-mode")!;
   zoteroPath = document.querySelector("#zotero-path")!;
   browseZoteroBtn = document.querySelector("#browse-zotero-btn")!;
@@ -663,11 +639,6 @@ window.addEventListener("DOMContentLoaded", () => {
     useRegex.checked = savedUseRegex === 'true';
   }
 
-  const savedShowPages = localStorage.getItem('pdfSearchShowPages');
-  if (savedShowPages !== null) {
-    showPages.checked = savedShowPages === 'true';
-  }
-
   const savedZoteroMode = localStorage.getItem('pdfSearchZoteroMode');
   if (savedZoteroMode !== null) {
     zoteroMode.checked = savedZoteroMode === 'true';
@@ -687,10 +658,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   useRegex.addEventListener("change", () => {
     localStorage.setItem('pdfSearchUseRegex', String(useRegex.checked));
-  });
-
-  showPages.addEventListener("change", () => {
-    localStorage.setItem('pdfSearchShowPages', String(showPages.checked));
   });
 
   zoteroMode.addEventListener("change", () => {
