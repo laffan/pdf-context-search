@@ -143,33 +143,47 @@ function renderResults(matches: SearchMatch[]) {
     const firstMatch = fileMatches[0];
     const zoteroMetadata = firstMatch.zotero_metadata;
 
+    // Debug: log zotero metadata
+    if (zoteroMetadata) {
+      console.log('Zotero metadata for', fileName, ':', zoteroMetadata);
+    }
+
     html += `
       <div class="result-file">
         <div class="result-file-header">
           <div class="result-file-header-content">
-            <div class="result-file-header-title">
-              ${zoteroMetadata ? `
-                <div class="zotero-header">
-                  <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
-                  ${zoteroMetadata.year || zoteroMetadata.authors ? `
-                    <div class="zotero-authors-year">
-                      ${zoteroMetadata.year ? escapeHtml(zoteroMetadata.year) : ''}
-                      ${zoteroMetadata.authors ? `- ${escapeHtml(zoteroMetadata.authors)}` : ''}
-                    </div>
-                  ` : ''}
+            ${zoteroMetadata ? `
+              <div class="zotero-header-title">
+                <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
+              </div>
+              ${zoteroMetadata.year || zoteroMetadata.authors ? `
+                <div class="zotero-authors-year">
+                  ${zoteroMetadata.year ? escapeHtml(zoteroMetadata.year) : ''}
+                  ${zoteroMetadata.authors ? `${zoteroMetadata.year ? ' - ' : ''}${escapeHtml(zoteroMetadata.authors)}` : ''}
                 </div>
-              ` : `<h3>${fileName}</h3>`}
+              ` : ''}
               <div class="result-file-header-buttons">
                 <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
                   <span>Matches (${fileMatches.length})</span>
                   <span class="result-matches-toggle-arrow">▼</span>
                 </button>
-                ${zoteroMetadata ? `<button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Citation</button>` : ''}
-                ${zoteroMetadata ? `<button class="btn-icon copy-zotero-link-btn" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">🔗 Link</button>` : ''}
+                <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Citation</button>
+                <button class="btn-icon copy-zotero-link-btn" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">🔗 Link</button>
               </div>
-            </div>
-            ${!zoteroMetadata ? `<div class="result-file-path">${filePath}</div>` : ''}
+            ` : `
+              <div class="result-file-header-title">
+                <h3>${fileName}</h3>
+                <div class="result-file-header-buttons">
+                  <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
+                  <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
+                    <span>Matches (${fileMatches.length})</span>
+                    <span class="result-matches-toggle-arrow">▼</span>
+                  </button>
+                </div>
+              </div>
+              <div class="result-file-path">${filePath}</div>
+            `}
           </div>
         </div>
         ${showPages.checked ? `<div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>` : ''}

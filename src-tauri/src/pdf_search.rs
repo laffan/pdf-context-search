@@ -59,6 +59,7 @@ pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
 // Build a map of PDF filenames to Zotero metadata
 fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata>> {
     let db_path = zotero_path.join("zotero.sqlite");
+    let bbt_db_path = zotero_path.join("better-bibtex.sqlite");
 
     if !db_path.exists() {
         return Err(anyhow::anyhow!("Zotero database not found at {:?}", db_path));
@@ -67,25 +68,37 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata
     let conn = Connection::open(&db_path)
         .context("Failed to open Zotero database")?;
 
+    // Open Better BibTeX database if it exists
+    let bbt_conn = if bbt_db_path.exists() {
+        Some(Connection::open(&bbt_db_path)
+            .context("Failed to open Better BibTeX database")?)
+    } else {
+        None
+    };
+
     // First, query to get basic item info and attachment paths
+    // We need both the attachment item and the parent item
     let mut stmt = conn.prepare(
-        "SELECT items.itemID, items.key, itemAttachments.path
+        "SELECT items.itemID, items.key, itemAttachments.path, itemAttachments.parentItemID, parent.key
          FROM items
          JOIN itemAttachments ON items.itemID = itemAttachments.itemID
+         LEFT JOIN items AS parent ON itemAttachments.parentItemID = parent.itemID
          WHERE itemAttachments.path IS NOT NULL"
     )?;
 
     let mut map = HashMap::new();
     let rows = stmt.query_map([], |row| {
         Ok((
-            row.get::<_, i32>(0)?,      // itemID
-            row.get::<_, String>(1)?,   // item key (citekey)
-            row.get::<_, String>(2)?,   // attachment path
+            row.get::<_, i32>(0)?,           // attachment itemID
+            row.get::<_, String>(1)?,        // attachment key
+            row.get::<_, String>(2)?,        // attachment path
+            row.get::<_, Option<i32>>(3)?,   // parent itemID (null if no parent)
+            row.get::<_, Option<String>>(4)?, // parent key (null if no parent)
         ))
     })?;
 
     for row in rows {
-        if let Ok((item_id, item_key, path)) = row {
+        if let Ok((attachment_id, attachment_key, path, parent_id, parent_key)) = row {
             // Extract filename from path (could be "storage:filename.pdf" or just "filename.pdf")
             let filename = if let Some(colon_pos) = path.rfind(':') {
                 &path[colon_pos + 1..]
@@ -93,15 +106,25 @@ fn build_zotero_map(zotero_path: &Path) -> Result<HashMap<String, ZoteroMetadata
                 path.rsplit('/').next().unwrap_or(&path)
             };
 
-            // Query for title, year, and creators
+            // Use parent item if available, otherwise use attachment item itself
+            let (item_id, item_key) = if let (Some(pid), Some(pkey)) = (parent_id, parent_key) {
+                (pid, pkey)
+            } else {
+                (attachment_id, attachment_key)
+            };
+
+            // Query for title, date, and creators from the parent item
             let title = get_item_field(&conn, item_id, "title").ok().flatten();
-            let year = get_item_field(&conn, item_id, "year").ok().flatten();
+            let date = get_item_field(&conn, item_id, "date").ok().flatten();
+            let year = extract_year(&date);
             let authors = get_item_creators(&conn, item_id).ok().flatten();
 
-            // Try to get the BibTeX citation key from the extra field
-            let bibtex_citekey = extract_bibtex_citekey(
-                &get_item_field(&conn, item_id, "extra").ok().flatten()
-            );
+            // Try to get the BibTeX citation key from Better BibTeX database
+            let bibtex_citekey = if let Some(ref bbt_conn) = bbt_conn {
+                get_better_bibtex_citekey(bbt_conn, &item_key).ok().flatten()
+            } else {
+                None
+            };
             let citekey = bibtex_citekey.unwrap_or_else(|| item_key.clone());
 
             map.insert(
@@ -140,7 +163,7 @@ fn get_item_field(conn: &Connection, item_id: i32, field_name: &str) -> Result<O
 // Helper function to get item creators (authors)
 fn get_item_creators(conn: &Connection, item_id: i32) -> Result<Option<String>> {
     let mut stmt = conn.prepare(
-        "SELECT creators.name
+        "SELECT creators.firstName, creators.lastName
          FROM creators
          JOIN itemCreators ON creators.creatorID = itemCreators.creatorID
          WHERE itemCreators.itemID = ?
@@ -149,12 +172,21 @@ fn get_item_creators(conn: &Connection, item_id: i32) -> Result<Option<String>> 
 
     let mut creators = Vec::new();
     let rows = stmt.query_map([item_id], |row| {
-        row.get::<_, String>(0)
+        Ok((
+            row.get::<_, Option<String>>(0)?,  // firstName (can be null)
+            row.get::<_, Option<String>>(1)?,  // lastName
+        ))
     })?;
 
     for row in rows {
-        if let Ok(creator) = row {
-            creators.push(creator);
+        if let Ok((first_name, last_name)) = row {
+            let name = match (first_name, last_name) {
+                (Some(first), Some(last)) => format!("{} {}", first, last),
+                (None, Some(last)) => last,
+                (Some(first), None) => first,
+                (None, None) => continue,
+            };
+            creators.push(name);
         }
     }
 
@@ -165,16 +197,31 @@ fn get_item_creators(conn: &Connection, item_id: i32) -> Result<Option<String>> 
     }
 }
 
-// Helper function to extract BibTeX citation key from the extra field
-// Zotero stores citation keys in the format: "Citation Key: coraiola2023"
-fn extract_bibtex_citekey(extra: &Option<String>) -> Option<String> {
-    if let Some(extra_text) = extra {
-        // Look for "Citation Key: " pattern (case-insensitive)
-        if let Some(start_pos) = extra_text.to_lowercase().find("citation key:") {
-            let after_label = &extra_text[start_pos + 13..]; // Skip past "citation key:"
-            let key = after_label.trim().split_whitespace().next()?;
-            if !key.is_empty() {
-                return Some(key.to_string());
+// Helper function to get Better BibTeX citation key
+fn get_better_bibtex_citekey(conn: &Connection, item_key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT citationKey FROM citationkey WHERE itemKey = ?"
+    )?;
+
+    let citekey = stmt.query_row([item_key], |row| {
+        row.get::<_, String>(0)
+    }).ok();
+
+    Ok(citekey)
+}
+
+// Helper function to extract year from date field
+// Zotero dates can be in various formats like "2023-01-00 01/2023" or "2023"
+fn extract_year(date: &Option<String>) -> Option<String> {
+    if let Some(date_str) = date {
+        // Try to find a 4-digit year
+        for part in date_str.split(|c: char| !c.is_numeric()) {
+            if part.len() == 4 {
+                if let Ok(year) = part.parse::<i32>() {
+                    if year >= 1000 && year <= 9999 {
+                        return Some(year.to_string());
+                    }
+                }
             }
         }
     }

@@ -279,18 +279,19 @@ body {
   flex: 1;
 }
 
-.zotero-header {
-  flex: 1;
+.zotero-header-title {
+  width: 100%;
 }
 
-.zotero-header h3 {
-  margin-bottom: 4px;
+.zotero-header-title h3 {
+  margin-bottom: 0;
 }
 
 .zotero-authors-year {
   font-size: 13px;
   color: var(--text-secondary);
   font-style: italic;
+  margin-bottom: 4px;
 }
 
 .result-file-header-buttons {
