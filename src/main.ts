@@ -37,7 +37,15 @@ interface SearchParams {
   zotero_path: string | null;
 }
 
+interface SearchHistoryItem {
+  query: string;
+  case_sensitive: boolean;
+  use_regex: boolean;
+  timestamp: number;
+}
+
 let currentResults: SearchMatch[] = [];
+const MAX_SEARCH_HISTORY = 10;
 
 // DOM Elements
 let searchForm: HTMLFormElement;
@@ -63,6 +71,40 @@ function showStatus(message: string, type: 'info' | 'error' | 'success') {
     statusMessage.className = '';
     statusMessage.textContent = '';
   }, 5000);
+}
+
+function getSearchHistory(): SearchHistoryItem[] {
+  const stored = localStorage.getItem('pdfSearchHistory');
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+}
+
+function saveSearchToHistory(query: string, caseSensitive: boolean, useRegex: boolean) {
+  const history = getSearchHistory();
+
+  // Remove existing entry with same query (for uniqueness)
+  const filtered = history.filter(item => item.query !== query);
+
+  // Add new entry at the beginning
+  filtered.unshift({
+    query,
+    case_sensitive: caseSensitive,
+    use_regex: useRegex,
+    timestamp: Date.now()
+  });
+
+  // Keep only last MAX_SEARCH_HISTORY items
+  const trimmed = filtered.slice(0, MAX_SEARCH_HISTORY);
+
+  localStorage.setItem('pdfSearchHistory', JSON.stringify(trimmed));
+}
+
+function clearSearchHistory() {
+  localStorage.removeItem('pdfSearchHistory');
 }
 
 async function browseDirectory() {
@@ -431,6 +473,96 @@ async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {
   }
 }
 
+function renderSearchDropdown() {
+  const history = getSearchHistory();
+  let dropdown = document.getElementById('search-dropdown');
+
+  // Remove existing dropdown if it exists
+  if (dropdown) {
+    dropdown.remove();
+  }
+
+  if (history.length === 0) {
+    return; // Don't show dropdown if no history
+  }
+
+  // Create dropdown
+  dropdown = document.createElement('div');
+  dropdown.id = 'search-dropdown';
+  dropdown.className = 'search-dropdown';
+
+  // Stop propagation on the dropdown itself to prevent click-outside handler
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  // Add history items
+  history.forEach(item => {
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'search-dropdown-item';
+
+    const querySpan = document.createElement('span');
+    querySpan.className = 'search-dropdown-query';
+    querySpan.textContent = item.query;
+    itemDiv.appendChild(querySpan);
+
+    const settingsSpan = document.createElement('span');
+    settingsSpan.className = 'search-dropdown-settings';
+    if (item.case_sensitive) {
+      const caseBadge = document.createElement('span');
+      caseBadge.className = 'search-setting-badge';
+      caseBadge.textContent = 'Aa';
+      caseBadge.title = 'Case-sensitive';
+      settingsSpan.appendChild(caseBadge);
+    }
+    if (item.use_regex) {
+      const regexBadge = document.createElement('span');
+      regexBadge.className = 'search-setting-badge';
+      regexBadge.textContent = '.*';
+      regexBadge.title = 'Regex';
+      settingsSpan.appendChild(regexBadge);
+    }
+    itemDiv.appendChild(settingsSpan);
+
+    // Click handler to populate search
+    itemDiv.addEventListener('click', (e) => {
+      e.stopPropagation();
+      searchQuery.value = item.query;
+      caseSensitive.checked = item.case_sensitive;
+      useRegex.checked = item.use_regex;
+      hideSearchDropdown();
+    });
+
+    dropdown.appendChild(itemDiv);
+  });
+
+  // Add clear button
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button'; // Important: prevent form submission
+  clearBtn.className = 'search-dropdown-clear';
+  clearBtn.textContent = 'Clear searches';
+  clearBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearSearchHistory();
+    hideSearchDropdown();
+  });
+  dropdown.appendChild(clearBtn);
+
+  // Insert dropdown into the form group (parent of the search input)
+  const formGroup = searchQuery.closest('.form-group');
+  if (formGroup) {
+    formGroup.appendChild(dropdown);
+  }
+}
+
+function hideSearchDropdown() {
+  const dropdown = document.getElementById('search-dropdown');
+  if (dropdown) {
+    dropdown.remove();
+  }
+}
+
 async function loadPageImage(filePath: string, pageNumber: number, searchQuery: string): Promise<HTMLCanvasElement> {
   try {
     // Read the PDF file from the backend (bypasses CORS issues)
@@ -547,6 +679,9 @@ async function performSearch(event: Event) {
 
     renderResults(results);
     showStatus(`Found ${results.length} ${results.length === 1 ? 'match' : 'matches'}`, 'success');
+
+    // Save to search history
+    saveSearchToHistory(query, caseSensitive.checked, useRegex.checked);
   } catch (error) {
     showStatus(`Search failed: ${error}`, 'error');
     resultsContainer.innerHTML = `
@@ -691,5 +826,22 @@ window.addEventListener("DOMContentLoaded", () => {
   zoteroMode.addEventListener("change", () => {
     localStorage.setItem('pdfSearchZoteroMode', String(zoteroMode.checked));
     toggleZoteroFolder();
+  });
+
+  // Search dropdown event listeners
+  searchQuery.addEventListener("focus", () => {
+    renderSearchDropdown();
+  });
+
+  searchQuery.addEventListener("click", () => {
+    renderSearchDropdown();
+  });
+
+  // Hide dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    const dropdown = document.getElementById('search-dropdown');
+    if (dropdown && !searchQuery.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
+      hideSearchDropdown();
+    }
   });
 });
