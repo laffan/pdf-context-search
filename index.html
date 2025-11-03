@@ -15,12 +15,22 @@
         <form id="search-form">
           <div class="form-group">
             <label for="search-query">Search Query</label>
-            <input
-              type="text"
-              id="search-query"
-              placeholder="Enter search term..."
-              required
-            />
+            <div id="search-queries-container">
+              <div class="search-query-item">
+                <input
+                  type="text"
+                  class="search-query-input"
+                  placeholder="Enter search term..."
+                  required
+                  data-index="0"
+                />
+                <label class="inline-checkbox">
+                  <input type="checkbox" class="use-regex-checkbox" data-index="0" />
+                  Use Regex
+                </label>
+              </div>
+            </div>
+            <a href="#" id="add-search-term" class="add-search-link">+ Add Search Term</a>
           </div>
 
           <div class="form-group">
@@ -35,20 +45,6 @@
               />
               <button type="button" id="browse-btn">Browse</button>
             </div>
-          </div>
-
-          <div class="form-group checkbox-group">
-            <label>
-              <input type="checkbox" id="case-sensitive" />
-              Case Sensitive
-            </label>
-          </div>
-
-          <div class="form-group checkbox-group">
-            <label>
-              <input type="checkbox" id="use-regex" />
-              Use Regex
-            </label>
           </div>
 
           <div class="form-group checkbox-group">

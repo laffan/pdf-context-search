@@ -30,13 +30,17 @@ pub struct SearchMatch {
     pub zotero_metadata: Option<ZoteroMetadata>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct QueryItem {
+    pub query: String,
+    pub use_regex: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SearchParams {
-    pub query: String,
+    pub queries: Vec<QueryItem>,
     pub directory: String,
     pub context_words: usize,
-    pub case_sensitive: bool,
-    pub use_regex: bool,
     pub zotero_path: Option<String>,
 }
 
@@ -281,7 +285,6 @@ fn search_in_page(
     page_text: &str,
     query: &str,
     context_words: usize,
-    case_sensitive: bool,
     use_regex: bool,
 ) -> Result<Vec<(String, String, String)>> {
     let mut matches = Vec::new();
@@ -291,11 +294,8 @@ fn search_in_page(
     let query_no_spaces = query.replace(" ", "");
 
     if use_regex {
-        let pattern = if case_sensitive {
-            Regex::new(&query_no_spaces)?
-        } else {
-            Regex::new(&format!("(?i){}", query_no_spaces))?
-        };
+        // Case-insensitive regex by default
+        let pattern = Regex::new(&format!("(?i){}", query_no_spaces))?;
 
         // Create a version of page_text without spaces for matching
         let page_text_no_spaces = page_text.replace(" ", "");
@@ -330,18 +330,11 @@ fn search_in_page(
             matches.push((context_before, matched_text, context_after));
         }
     } else {
-        let search_query = if case_sensitive {
-            query_no_spaces.clone()
-        } else {
-            query_no_spaces.to_lowercase()
-        };
+        // Case-insensitive search by default
+        let search_query = query_no_spaces.to_lowercase();
 
         for (i, word) in words.iter().enumerate() {
-            let compare_word = if case_sensitive {
-                word.clone()
-            } else {
-                word.to_lowercase()
-            };
+            let compare_word = word.to_lowercase();
 
             if compare_word.contains(&search_query) {
                 let start = i.saturating_sub(context_words);
@@ -359,16 +352,13 @@ fn search_in_page(
     Ok(matches)
 }
 
-fn search_pdf(
+fn search_pdf_with_queries(
     pdf_path: &Path,
-    query: &str,
+    queries: &[QueryItem],
     context_words: usize,
-    case_sensitive: bool,
-    use_regex: bool,
     zotero_map: Option<&HashMap<String, ZoteroMetadata>>,
 ) -> Result<Vec<SearchMatch>> {
     let pages = extract_text_from_pdf(pdf_path)?;
-    let mut results = Vec::new();
 
     // Get filename and lookup Zotero metadata if available
     let file_name = pdf_path
@@ -385,11 +375,36 @@ fn search_pdf(
         ))
         .unwrap_or((None, None));
 
+    // First, check if the PDF contains ALL queries (anywhere in the document)
+    // For each query, we need to find at least one page that contains it
+    for query_item in queries.iter() {
+        let mut found_in_pdf = false;
+
+        for (_page_num, page_text) in &pages {
+            let matches = search_in_page(page_text, &query_item.query, context_words, query_item.use_regex)?;
+
+            if !matches.is_empty() {
+                found_in_pdf = true;
+                break;
+            }
+        }
+
+        if !found_in_pdf {
+            // This PDF doesn't contain this query anywhere, so skip the entire PDF
+            return Ok(Vec::new());
+        }
+    }
+
+    // If we get here, the PDF contains all queries (on any pages)
+    // Now return the matches from the LAST query only
+    let last_query = &queries[queries.len() - 1];
+    let mut final_results = Vec::new();
+
     for (page_num, page_text) in pages {
-        let matches = search_in_page(&page_text, query, context_words, case_sensitive, use_regex)?;
+        let matches = search_in_page(&page_text, &last_query.query, context_words, last_query.use_regex)?;
 
         for (context_before, matched_text, context_after) in matches {
-            results.push(SearchMatch {
+            final_results.push(SearchMatch {
                 file_path: pdf_path.to_string_lossy().to_string(),
                 file_name: file_name.clone(),
                 page_number: page_num,
@@ -402,11 +417,16 @@ fn search_pdf(
         }
     }
 
-    Ok(results)
+    Ok(final_results)
 }
 
 pub fn search_pdfs(params: SearchParams) -> Result<Vec<SearchMatch>> {
     let directory = PathBuf::from(&params.directory);
+
+    if params.queries.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let pdf_files = find_pdf_files(&directory)?;
 
     if pdf_files.is_empty() {
@@ -427,16 +447,14 @@ pub fn search_pdfs(params: SearchParams) -> Result<Vec<SearchMatch>> {
         None
     };
 
-    // Search all PDFs in parallel
+    // Search all PDFs in parallel, applying all queries to each PDF
     let all_matches: Vec<SearchMatch> = pdf_files
         .par_iter()
         .filter_map(|pdf_path| {
-            match search_pdf(
+            match search_pdf_with_queries(
                 pdf_path,
-                &params.query,
+                &params.queries,
                 params.context_words,
-                params.case_sensitive,
-                params.use_regex,
                 zotero_map.as_ref(),
             ) {
                 Ok(matches) => Some(matches),

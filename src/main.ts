@@ -28,19 +28,20 @@ interface SearchMatch {
   zotero_metadata: ZoteroMetadata | null;
 }
 
-interface SearchParams {
+interface QueryItem {
   query: string;
+  use_regex: boolean;
+}
+
+interface SearchParams {
+  queries: QueryItem[];
   directory: string;
   context_words: number;
-  case_sensitive: boolean;
-  use_regex: boolean;
   zotero_path: string | null;
 }
 
 interface SearchHistoryItem {
-  query: string;
-  case_sensitive: boolean;
-  use_regex: boolean;
+  queries: QueryItem[];
   timestamp: number;
 }
 
@@ -49,11 +50,10 @@ const MAX_SEARCH_HISTORY = 10;
 
 // DOM Elements
 let searchForm: HTMLFormElement;
-let searchQuery: HTMLInputElement;
+let searchQueriesContainer: HTMLElement;
+let addSearchTermBtn: HTMLAnchorElement;
 let directoryPath: HTMLInputElement;
 let browseBtn: HTMLButtonElement;
-let caseSensitive: HTMLInputElement;
-let useRegex: HTMLInputElement;
 let zoteroMode: HTMLInputElement;
 let zoteroPath: HTMLInputElement;
 let browseZoteroBtn: HTMLButtonElement;
@@ -63,6 +63,8 @@ let exportBtn: HTMLButtonElement;
 let statusMessage: HTMLElement;
 let resultsCount: HTMLElement;
 let resultsContainer: HTMLElement;
+
+let queryCount = 1;
 
 function showStatus(message: string, type: 'info' | 'error' | 'success') {
   statusMessage.textContent = message;
@@ -77,23 +79,26 @@ function getSearchHistory(): SearchHistoryItem[] {
   const stored = localStorage.getItem('pdfSearchHistory');
   if (!stored) return [];
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    // Filter out old format entries (backward compatibility)
+    return parsed.filter((item: any) => Array.isArray(item.queries));
   } catch {
     return [];
   }
 }
 
-function saveSearchToHistory(query: string, caseSensitive: boolean, useRegex: boolean) {
+function saveSearchToHistory(queries: QueryItem[]) {
   const history = getSearchHistory();
 
-  // Remove existing entry with same query (for uniqueness)
-  const filtered = history.filter(item => item.query !== query);
+  // Serialize queries for comparison
+  const queryStr = JSON.stringify(queries);
+
+  // Remove existing entry with same queries (for uniqueness)
+  const filtered = history.filter(item => JSON.stringify(item.queries) !== queryStr);
 
   // Add new entry at the beginning
   filtered.unshift({
-    query,
-    case_sensitive: caseSensitive,
-    use_regex: useRegex,
+    queries,
     timestamp: Date.now()
   });
 
@@ -105,6 +110,63 @@ function saveSearchToHistory(query: string, caseSensitive: boolean, useRegex: bo
 
 function clearSearchHistory() {
   localStorage.removeItem('pdfSearchHistory');
+}
+
+function addSearchQueryItem() {
+  const container = searchQueriesContainer;
+  const index = queryCount++;
+
+  const queryItem = document.createElement('div');
+  queryItem.className = 'search-query-item';
+  queryItem.dataset.index = String(index);
+
+  queryItem.innerHTML = `
+    <input
+      type="text"
+      class="search-query-input"
+      placeholder="Enter search term..."
+      data-index="${index}"
+    />
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <label class="inline-checkbox">
+        <input type="checkbox" class="use-regex-checkbox" data-index="${index}" />
+        Use Regex
+      </label>
+      <button type="button" class="remove-query-btn" data-index="${index}">×</button>
+    </div>
+  `;
+
+  container.appendChild(queryItem);
+
+  // Add event listener to remove button
+  const removeBtn = queryItem.querySelector('.remove-query-btn') as HTMLButtonElement;
+  removeBtn.addEventListener('click', () => removeSearchQueryItem(index));
+}
+
+function removeSearchQueryItem(index: number) {
+  const queryItem = searchQueriesContainer.querySelector(`[data-index="${index}"]`);
+  if (queryItem) {
+    queryItem.remove();
+  }
+}
+
+function getAllQueries(): QueryItem[] {
+  const inputs = searchQueriesContainer.querySelectorAll('.search-query-input') as NodeListOf<HTMLInputElement>;
+  const queries: QueryItem[] = [];
+
+  inputs.forEach(input => {
+    const query = input.value.trim();
+    if (query) {
+      const index = input.dataset.index!;
+      const regexCheckbox = searchQueriesContainer.querySelector(`.use-regex-checkbox[data-index="${index}"]`) as HTMLInputElement;
+      queries.push({
+        query,
+        use_regex: regexCheckbox.checked
+      });
+    }
+  });
+
+  return queries;
 }
 
 async function browseDirectory() {
@@ -328,7 +390,8 @@ function renderResults(matches: SearchMatch[]) {
           arrow.classList.add('open');
 
           // Load pages
-          const query = searchQuery.value.trim();
+          const queries = getAllQueries();
+          const query = queries.length > 0 ? queries[queries.length - 1].query : '';
           const pageElements = matchesContainer.querySelectorAll('.page-preview');
           pageElements.forEach((pageElement) => {
             const pageId = pageElement.id;
@@ -503,23 +566,18 @@ function renderSearchDropdown() {
 
     const querySpan = document.createElement('span');
     querySpan.className = 'search-dropdown-query';
-    querySpan.textContent = item.query;
+    // Display first query or multiple queries
+    querySpan.textContent = item.queries.map(q => q.query).join(' → ');
     itemDiv.appendChild(querySpan);
 
     const settingsSpan = document.createElement('span');
     settingsSpan.className = 'search-dropdown-settings';
-    if (item.case_sensitive) {
-      const caseBadge = document.createElement('span');
-      caseBadge.className = 'search-setting-badge';
-      caseBadge.textContent = 'Aa';
-      caseBadge.title = 'Case-sensitive';
-      settingsSpan.appendChild(caseBadge);
-    }
-    if (item.use_regex) {
+    // Show regex badge if any query uses regex
+    if (item.queries.some(q => q.use_regex)) {
       const regexBadge = document.createElement('span');
       regexBadge.className = 'search-setting-badge';
       regexBadge.textContent = '.*';
-      regexBadge.title = 'Regex';
+      regexBadge.title = 'Uses regex';
       settingsSpan.appendChild(regexBadge);
     }
     itemDiv.appendChild(settingsSpan);
@@ -527,9 +585,42 @@ function renderSearchDropdown() {
     // Click handler to populate search
     itemDiv.addEventListener('click', (e) => {
       e.stopPropagation();
-      searchQuery.value = item.query;
-      caseSensitive.checked = item.case_sensitive;
-      useRegex.checked = item.use_regex;
+      // Clear existing query items and rebuild
+      searchQueriesContainer.innerHTML = '';
+      queryCount = 0;
+
+      item.queries.forEach((queryItem, index) => {
+        const newIndex = queryCount++;
+        const queryItemEl = document.createElement('div');
+        queryItemEl.className = 'search-query-item';
+        queryItemEl.dataset.index = String(newIndex);
+
+        queryItemEl.innerHTML = `
+          <input
+            type="text"
+            class="search-query-input"
+            placeholder="Enter search term..."
+            data-index="${newIndex}"
+            value="${escapeHtml(queryItem.query)}"
+          />
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="inline-checkbox">
+              <input type="checkbox" class="use-regex-checkbox" data-index="${newIndex}" ${queryItem.use_regex ? 'checked' : ''} />
+              Use Regex
+            </label>
+            ${index > 0 ? `<button type="button" class="remove-query-btn" data-index="${newIndex}">×</button>` : ''}
+          </div>
+        `;
+
+        searchQueriesContainer.appendChild(queryItemEl);
+
+        // Add event listener to remove button if it exists
+        if (index > 0) {
+          const removeBtn = queryItemEl.querySelector('.remove-query-btn') as HTMLButtonElement;
+          removeBtn.addEventListener('click', () => removeSearchQueryItem(newIndex));
+        }
+      });
+
       hideSearchDropdown();
     });
 
@@ -549,8 +640,8 @@ function renderSearchDropdown() {
   });
   dropdown.appendChild(clearBtn);
 
-  // Insert dropdown into the form group (parent of the search input)
-  const formGroup = searchQuery.closest('.form-group');
+  // Insert dropdown into the form group
+  const formGroup = searchQueriesContainer.closest('.form-group');
   if (formGroup) {
     formGroup.appendChild(dropdown);
   }
@@ -646,11 +737,11 @@ async function loadPageImage(filePath: string, pageNumber: number, searchQuery: 
 async function performSearch(event: Event) {
   event.preventDefault();
 
-  const query = searchQuery.value.trim();
+  const queries = getAllQueries();
   const directory = directoryPath.value.trim();
 
-  if (!query || !directory) {
-    showStatus('Please enter a search query and select a directory', 'error');
+  if (queries.length === 0 || !directory) {
+    showStatus('Please enter at least one search query and select a directory', 'error');
     return;
   }
 
@@ -666,11 +757,9 @@ async function performSearch(event: Event) {
 
   try {
     const params: SearchParams = {
-      query,
+      queries,
       directory,
       context_words: 100, // Default context words (not user-configurable)
-      case_sensitive: caseSensitive.checked,
-      use_regex: useRegex.checked,
       zotero_path: zoteroMode.checked ? zoteroPath.value.trim() || null : null,
     };
 
@@ -681,7 +770,7 @@ async function performSearch(event: Event) {
     showStatus(`Found ${results.length} ${results.length === 1 ? 'match' : 'matches'}`, 'success');
 
     // Save to search history
-    saveSearchToHistory(query, caseSensitive.checked, useRegex.checked);
+    saveSearchToHistory(queries);
   } catch (error) {
     showStatus(`Search failed: ${error}`, 'error');
     resultsContainer.innerHTML = `
@@ -766,11 +855,10 @@ async function copyResults() {
 window.addEventListener("DOMContentLoaded", () => {
   // Get DOM elements
   searchForm = document.querySelector("#search-form")!;
-  searchQuery = document.querySelector("#search-query")!;
+  searchQueriesContainer = document.querySelector("#search-queries-container")!;
+  addSearchTermBtn = document.querySelector("#add-search-term")!;
   directoryPath = document.querySelector("#directory-path")!;
   browseBtn = document.querySelector("#browse-btn")!;
-  caseSensitive = document.querySelector("#case-sensitive")!;
-  useRegex = document.querySelector("#use-regex")!;
   zoteroMode = document.querySelector("#zotero-mode")!;
   zoteroPath = document.querySelector("#zotero-path")!;
   browseZoteroBtn = document.querySelector("#browse-zotero-btn")!;
@@ -792,16 +880,6 @@ window.addEventListener("DOMContentLoaded", () => {
     zoteroPath.value = savedZoteroPath;
   }
 
-  const savedCaseSensitive = localStorage.getItem('pdfSearchCaseSensitive');
-  if (savedCaseSensitive !== null) {
-    caseSensitive.checked = savedCaseSensitive === 'true';
-  }
-
-  const savedUseRegex = localStorage.getItem('pdfSearchUseRegex');
-  if (savedUseRegex !== null) {
-    useRegex.checked = savedUseRegex === 'true';
-  }
-
   const savedZoteroMode = localStorage.getItem('pdfSearchZoteroMode');
   if (savedZoteroMode !== null) {
     zoteroMode.checked = savedZoteroMode === 'true';
@@ -814,13 +892,10 @@ window.addEventListener("DOMContentLoaded", () => {
   browseZoteroBtn.addEventListener("click", browseZoteroDirectory);
   exportBtn.addEventListener("click", copyResults);
 
-  // Persist settings when they change
-  caseSensitive.addEventListener("change", () => {
-    localStorage.setItem('pdfSearchCaseSensitive', String(caseSensitive.checked));
-  });
-
-  useRegex.addEventListener("change", () => {
-    localStorage.setItem('pdfSearchUseRegex', String(useRegex.checked));
+  // Add search term button
+  addSearchTermBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    addSearchQueryItem();
   });
 
   zoteroMode.addEventListener("change", () => {
@@ -829,18 +904,20 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Search dropdown event listeners
-  searchQuery.addEventListener("focus", () => {
+  searchQueriesContainer.addEventListener("focus", () => {
     renderSearchDropdown();
-  });
+  }, true);
 
-  searchQuery.addEventListener("click", () => {
-    renderSearchDropdown();
+  searchQueriesContainer.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).classList.contains('search-query-input')) {
+      renderSearchDropdown();
+    }
   });
 
   // Hide dropdown when clicking outside
   document.addEventListener("click", (e) => {
     const dropdown = document.getElementById('search-dropdown');
-    if (dropdown && !searchQuery.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
+    if (dropdown && !searchQueriesContainer.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
       hideSearchDropdown();
     }
   });
