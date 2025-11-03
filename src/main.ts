@@ -167,7 +167,7 @@ function renderResults(matches: SearchMatch[]) {
                   <span>Matches (${fileMatches.length})</span>
                   <span class="result-matches-toggle-arrow">▼</span>
                 </button>
-                <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Citation</button>
+                <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
                 <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
               </div>
             ` : `
@@ -185,7 +185,6 @@ function renderResults(matches: SearchMatch[]) {
             `}
           </div>
         </div>
-        <div class="cover-page-container" id="cover-${fileId}" style="display: none;"></div>
         <div class="result-matches" id="matches-${fileId}">
     `;
 
@@ -372,34 +371,63 @@ async function openInZotero(attachmentKey: string, pageNumber: number, element: 
 
 async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {
   const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
-  const coverContainer = document.getElementById(`cover-${fileId}`);
+  let coverContainer = document.getElementById(`cover-overlay-${fileId}`);
 
-  if (!coverContainer) return;
+  // If overlay doesn't exist, create it
+  if (!coverContainer) {
+    coverContainer = document.createElement('div');
+    coverContainer.id = `cover-overlay-${fileId}`;
+    coverContainer.className = 'cover-page-container';
+    document.body.appendChild(coverContainer);
 
-  const isVisible = coverContainer.style.display !== 'none';
+    // Add close button
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'cover-page-close';
+    closeBtn.textContent = '×';
+    closeBtn.onclick = () => {
+      coverContainer!.classList.remove('visible');
+      button.style.opacity = '0.7';
+    };
+    coverContainer.appendChild(closeBtn);
+
+    // Click on overlay background to close
+    coverContainer.addEventListener('click', (e) => {
+      if (e.target === coverContainer) {
+        coverContainer!.classList.remove('visible');
+        button.style.opacity = '0.7';
+      }
+    });
+  }
+
+  const isVisible = coverContainer.classList.contains('visible');
 
   if (isVisible) {
-    // Hide the cover
-    coverContainer.style.display = 'none';
+    // Hide the overlay
+    coverContainer.classList.remove('visible');
     button.style.opacity = '0.7';
   } else {
-    // Show the cover
-    coverContainer.style.display = 'flex';
+    // Show the overlay
+    coverContainer.classList.add('visible');
+    button.style.opacity = '1';
 
     // Check if already loaded
     if (!coverContainer.querySelector('canvas') && !coverContainer.querySelector('img')) {
-      coverContainer.innerHTML = '<div class="loading">Loading cover page...</div>';
+      // Create wrapper for content
+      const wrapper = document.createElement('div');
+      wrapper.className = 'cover-page-wrapper';
+      wrapper.innerHTML = '<div class="loading">Loading cover page...</div>';
+
+      // Insert after close button
+      coverContainer.appendChild(wrapper);
 
       try {
         const canvas = await loadPageImage(filePath, 1, '');
-        coverContainer.innerHTML = '';
-        coverContainer.appendChild(canvas);
+        wrapper.innerHTML = '';
+        wrapper.appendChild(canvas);
       } catch {
-        coverContainer.innerHTML = '<div class="page-preview-error">Failed to load cover page</div>';
+        wrapper.innerHTML = '<div class="page-preview-error">Failed to load cover page</div>';
       }
     }
-
-    button.style.opacity = '1';
   }
 }
 
