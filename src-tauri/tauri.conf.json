@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "pdf-search-gui",
+  "productName": "PDF Context Search",
   "version": "0.1.0",
-  "identifier": "com.pdf-search-gui.app",
+  "identifier": "com.pdf-context-search.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "pdf-search-gui",
+        "title": "PDF Context Search",
         "width": 800,
         "height": 600
       }
