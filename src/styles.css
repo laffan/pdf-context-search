@@ -537,12 +537,14 @@ body {
   padding: 16px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 11;
   margin-left: -24px;
   margin-right: -24px;
   padding-left: 40px;
   padding-right: 40px;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .result-file-header-content {
@@ -728,9 +730,16 @@ body {
   border-bottom: 2px solid var(--primary-color);
 }
 
-.result-file.pinned {
-  border-left: 4px solid var(--primary-color);
+/* When accordion is open, move border to filter bar */
+.result-file-header + .result-matches-filter.visible {
+  border-bottom: 2px solid var(--primary-color);
 }
+
+/* Remove header border when filter is visible */
+.result-file-header:has(+ .result-matches-filter.visible) {
+  border-bottom: none;
+}
+
 
 .result-file-path {
   font-size: 12px;
@@ -892,8 +901,8 @@ body {
 /* Search filter bar above matches */
 .result-matches-filter {
   position: sticky;
-  top: 0;
-  z-index: 9;
+  top: var(--header-height, 80px);
+  z-index: 10;
   background-color: var(--background);
   border-bottom: 1px solid var(--border-color);
   padding: 0 16px;
@@ -904,6 +913,10 @@ body {
   overflow: hidden;
   white-space: nowrap;
   transition: height 0.3s ease-out;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding-left: 40px;
+  padding-right: 40px;
 }
 
 .result-matches-filter.visible {
@@ -962,6 +975,20 @@ body {
 .result-matches-query-filter label {
   cursor: pointer;
   user-select: none;
+}
+
+.remove-custom-query {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.remove-custom-query:hover {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 /* Column Layout Styles for Matches */
