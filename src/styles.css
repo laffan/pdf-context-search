@@ -581,6 +581,41 @@ body {
 .result-file-header-buttons {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.pdf-search-input-container {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-search-input-container.visible {
+  display: flex;
+}
+
+.pdf-search-input {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  width: 200px;
+  transition: border-color 0.2s;
+  height: 28px;
+}
+
+.pdf-search-input:focus {
+  outline: none;
+  border-color: #0080ff;
+  box-shadow: 0 0 0 2px rgba(0, 128, 255, 0.1);
+}
+
+.pdf-search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .btn-icon {

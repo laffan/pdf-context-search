@@ -50,6 +50,9 @@ interface SearchHistoryItem {
 let currentResults: SearchMatch[] = [];
 const MAX_SEARCH_HISTORY = 10;
 
+// Store per-PDF search queries (filePath -> query string)
+const perPdfSearchQueries = new Map<string, string>();
+
 // DOM Elements
 let searchForm: HTMLFormElement;
 let searchQueriesContainer: HTMLElement;
@@ -315,6 +318,9 @@ function renderResults(matches: SearchMatch[]) {
                 <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
                 <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
+                <div class="pdf-search-input-container" data-fileid="${fileId}">
+                  <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                </div>
               </div>
             ` : `
               <div class="result-file-header-title">
@@ -325,6 +331,9 @@ function renderResults(matches: SearchMatch[]) {
                     <span class="result-matches-toggle-arrow">►</span>
                   </button>
                   <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
+                  <div class="pdf-search-input-container" data-fileid="${fileId}">
+                    <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                  </div>
                 </div>
               </div>
               <div class="result-file-path">${filePath}</div>
@@ -428,6 +437,7 @@ function renderResults(matches: SearchMatch[]) {
       const fileId = (toggle as HTMLElement).dataset.fileid;
       const matchesContainer = document.getElementById(`matches-${fileId}`);
       const arrow = toggle.querySelector('.result-matches-toggle-arrow');
+      const searchInputContainer = document.querySelector(`.pdf-search-input-container[data-fileid="${fileId}"]`);
 
       if (matchesContainer && arrow) {
         const isOpen = matchesContainer.classList.contains('open');
@@ -436,6 +446,9 @@ function renderResults(matches: SearchMatch[]) {
           // Opening - load pages
           matchesContainer.classList.add('open');
           arrow.classList.add('open');
+          if (searchInputContainer) {
+            searchInputContainer.classList.add('visible');
+          }
 
           // Load pages
           const queries = getAllQueries();
@@ -450,7 +463,19 @@ function renderResults(matches: SearchMatch[]) {
               // Find the actual file path from fileGroups
               for (const [filePath] of fileGroups.entries()) {
                 if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
-                  loadPageImage(filePath, pageNumber, queries)
+                  // Combine main queries with per-PDF query if it exists
+                  const combinedQueries = [...queries];
+                  const perPdfQuery = perPdfSearchQueries.get(filePath);
+                  if (perPdfQuery) {
+                    combinedQueries.push({
+                      query: perPdfQuery,
+                      use_regex: false,
+                      query_type: 'parallel',
+                      color: '#0080ff' // Bright blue for per-PDF searches
+                    });
+                  }
+
+                  loadPageImage(filePath, pageNumber, combinedQueries)
                     .then(canvas => {
                       if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
                         pageElement.innerHTML = '';
@@ -469,6 +494,75 @@ function renderResults(matches: SearchMatch[]) {
           // Closing
           matchesContainer.classList.remove('open');
           arrow.classList.remove('open');
+          if (searchInputContainer) {
+            searchInputContainer.classList.remove('visible');
+          }
+        }
+      }
+    });
+  });
+
+  // Set up event listeners for per-PDF search inputs
+  document.querySelectorAll('.pdf-search-input').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const inputElement = e.target as HTMLInputElement;
+        const filePath = inputElement.dataset.filepath;
+        const fileId = inputElement.dataset.fileid;
+        const searchQuery = inputElement.value.trim();
+
+        if (filePath && fileId) {
+          // Store or clear the per-PDF query
+          if (searchQuery) {
+            perPdfSearchQueries.set(filePath, searchQuery);
+          } else {
+            perPdfSearchQueries.delete(filePath);
+          }
+
+          // Re-render the pages with combined queries
+          const matchesContainer = document.getElementById(`matches-${fileId}`);
+          if (matchesContainer && matchesContainer.classList.contains('open')) {
+            const queries = getAllQueries();
+            const pageElements = matchesContainer.querySelectorAll('.page-preview');
+
+            pageElements.forEach((pageElement) => {
+              const pageId = pageElement.id;
+              const match = pageId.match(/page-(.+)-(\d+)$/);
+              if (match) {
+                const filePathKey = match[1];
+                const pageNumber = parseInt(match[2]);
+
+                // Find the actual file path from fileGroups
+                for (const [fp] of fileGroups.entries()) {
+                  if (fp.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey && fp === filePath) {
+                    // Combine main queries with per-PDF query
+                    const combinedQueries = [...queries];
+                    if (searchQuery) {
+                      combinedQueries.push({
+                        query: searchQuery,
+                        use_regex: false,
+                        query_type: 'parallel',
+                        color: '#0080ff' // Bright blue for per-PDF searches
+                      });
+                    }
+
+                    // Clear and re-render the page
+                    pageElement.innerHTML = '<div class="page-preview-loading">Updating preview...</div>';
+                    loadPageImage(fp, pageNumber, combinedQueries)
+                      .then(canvas => {
+                        pageElement.innerHTML = '';
+                        pageElement.appendChild(canvas);
+                      })
+                      .catch(() => {
+                        pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                      });
+                    break;
+                  }
+                }
+              }
+            });
+          }
         }
       }
     });
@@ -827,6 +921,9 @@ async function performSearch(event: Event) {
     showStatus('Please enter at least one search query and select a directory', 'error');
     return;
   }
+
+  // Clear per-PDF search queries for new search
+  perPdfSearchQueries.clear();
 
   // Show loading state
   searchBtn.disabled = true;
