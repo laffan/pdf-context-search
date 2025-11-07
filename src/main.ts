@@ -55,10 +55,10 @@ let searchForm: HTMLFormElement;
 let searchQueriesContainer: HTMLElement;
 let addSearchTermBtn: HTMLAnchorElement;
 let addFilterTermBtn: HTMLAnchorElement;
-let directoryPath: HTMLInputElement;
+let directoryPath: HTMLElement;
 let browseBtn: HTMLButtonElement;
 let zoteroMode: HTMLInputElement;
-let zoteroPath: HTMLInputElement;
+let zoteroPath: HTMLElement;
 let browseZoteroBtn: HTMLButtonElement;
 let zoteroFolderGroup: HTMLElement;
 let searchBtn: HTMLButtonElement;
@@ -218,7 +218,8 @@ async function browseDirectory() {
     });
 
     if (selected && typeof selected === 'string') {
-      directoryPath.value = selected;
+      directoryPath.textContent = selected;
+      directoryPath.title = selected; // Show full path on hover
       // Persist the directory selection
       localStorage.setItem('pdfSearchDirectory', selected);
     }
@@ -236,7 +237,8 @@ async function browseZoteroDirectory() {
     });
 
     if (selected && typeof selected === 'string') {
-      zoteroPath.value = selected;
+      zoteroPath.textContent = selected;
+      zoteroPath.title = selected; // Show full path on hover
       // Persist the zotero directory selection
       localStorage.setItem('pdfSearchZoteroPath', selected);
     }
@@ -813,7 +815,7 @@ async function performSearch(event: Event) {
   event.preventDefault();
 
   const queries = getAllQueries();
-  const directory = directoryPath.value.trim();
+  const directory = (directoryPath.textContent || '').trim();
 
   if (queries.length === 0 || !directory) {
     showStatus('Please enter at least one search query and select a directory', 'error');
@@ -835,7 +837,7 @@ async function performSearch(event: Event) {
       queries,
       directory,
       context_words: 100, // Default context words (not user-configurable)
-      zotero_path: zoteroMode.checked ? zoteroPath.value.trim() || null : null,
+      zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
     };
 
     const results = await invoke<SearchMatch[]>('search_pdf_files', { params });
@@ -948,12 +950,14 @@ window.addEventListener("DOMContentLoaded", () => {
   // Load persisted settings
   const savedDirectory = localStorage.getItem('pdfSearchDirectory');
   if (savedDirectory) {
-    directoryPath.value = savedDirectory;
+    directoryPath.textContent = savedDirectory;
+    directoryPath.title = savedDirectory;
   }
 
   const savedZoteroPath = localStorage.getItem('pdfSearchZoteroPath');
   if (savedZoteroPath) {
-    zoteroPath.value = savedZoteroPath;
+    zoteroPath.textContent = savedZoteroPath;
+    zoteroPath.title = savedZoteroPath;
   }
 
   const savedZoteroMode = localStorage.getItem('pdfSearchZoteroMode');

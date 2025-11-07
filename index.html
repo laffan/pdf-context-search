@@ -46,13 +46,11 @@
           <div class="form-group">
             <label for="directory-path">Directory</label>
             <div class="directory-picker">
-              <input
-                type="text"
+              <div
                 id="directory-path"
-                placeholder="Select directory..."
-                readonly
-                required
-              />
+                class="directory-path-display"
+                title=""
+              >Select directory...</div>
               <button type="button" id="browse-btn">Browse</button>
             </div>
           </div>
@@ -67,12 +65,11 @@
           <div class="form-group" id="zotero-folder-group" style="display: none;">
             <label for="zotero-path">Zotero Data Directory</label>
             <div class="directory-picker">
-              <input
-                type="text"
+              <div
                 id="zotero-path"
-                placeholder="Select Zotero data directory..."
-                readonly
-              />
+                class="directory-path-display"
+                title=""
+              >Select Zotero data directory...</div>
               <button type="button" id="browse-zotero-btn">Browse</button>
             </div>
           </div>

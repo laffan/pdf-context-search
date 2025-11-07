@@ -93,10 +93,23 @@ body {
 .directory-picker {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
-.directory-picker input {
+.directory-path-display {
   flex: 1;
+  min-width: 0; /* Allow flexbox to shrink below content size */
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: var(--background);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
 }
 
 .directory-picker button {
