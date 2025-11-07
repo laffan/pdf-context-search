@@ -306,11 +306,11 @@ function renderResults(matches: SearchMatch[]) {
                 </div>
               ` : ''}
               <div class="result-file-header-buttons">
-                <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
-                  <span>Matches (${fileMatches.length})</span>
-                  <span class="result-matches-toggle-arrow">▼</span>
+                  <span>✓ Matches (${fileMatches.length})</span>
+                  <span class="result-matches-toggle-arrow">►</span>
                 </button>
+                <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
                 <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
               </div>
@@ -318,11 +318,11 @@ function renderResults(matches: SearchMatch[]) {
               <div class="result-file-header-title">
                 <h3>${fileName}</h3>
                 <div class="result-file-header-buttons">
-                  <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                   <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
-                    <span>Matches (${fileMatches.length})</span>
-                    <span class="result-matches-toggle-arrow">▼</span>
+                    <span>✓ Matches (${fileMatches.length})</span>
+                    <span class="result-matches-toggle-arrow">►</span>
                   </button>
+                  <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                 </div>
               </div>
               <div class="result-file-path">${filePath}</div>
