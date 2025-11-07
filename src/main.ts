@@ -444,7 +444,10 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
             return `
             <div class="result-matches-query-filter">
               <input type="checkbox" id="query-filter-original-${fileId}-${i}" data-query-type="original" data-query="${escapeHtml(q.query)}" data-color="${q.color}" checked />
-              <label for="query-filter-original-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
+              <label for="query-filter-original-${fileId}-${i}">
+                <span class="query-color-indicator" style="background-color: ${q.color};"></span>
+                ${escapeHtml(q.query)} - ${queryMatchCount}
+              </label>
             </div>
           `;
           }).join('') : ''}
@@ -462,7 +465,10 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
               return `
               <div class="result-matches-query-filter">
                 <input type="checkbox" id="query-filter-current-${fileId}-${i}" data-query-type="current" data-query="${escapeHtml(q.query)}" data-color="${q.color}" checked />
-                <label for="query-filter-current-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
+                <label for="query-filter-current-${fileId}-${i}">
+                  <span class="query-color-indicator" style="background-color: ${q.color};"></span>
+                  ${escapeHtml(q.query)} - ${queryMatchCount}
+                </label>
               </div>
             `;
             }).join('');
@@ -822,7 +828,10 @@ function renderResults(matches: SearchMatch[]) {
                 filterDiv.className = 'result-matches-query-filter custom-query';
                 filterDiv.innerHTML = `
                   <input type="checkbox" id="${checkboxId}" data-query-type="custom" data-query="${escapeHtml(searchQuery)}" data-color="${customQueryColor}" checked />
-                  <label for="${checkboxId}">${escapeHtml(searchQuery)} - ${matchCount} <a href="#" class="remove-custom-query" data-checkbox-id="${checkboxId}">(Remove)</a></label>
+                  <label for="${checkboxId}">
+                    <span class="query-color-indicator" style="background-color: ${customQueryColor};"></span>
+                    ${escapeHtml(searchQuery)} - ${matchCount} <a href="#" class="remove-custom-query" data-checkbox-id="${checkboxId}">(Remove)</a>
+                  </label>
                 `;
                 filtersContainer.appendChild(filterDiv);
 

@@ -975,6 +975,16 @@ body {
 .result-matches-query-filter label {
   cursor: pointer;
   user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.query-color-indicator {
+  width: 5px;
+  height: 1em;
+  border-radius: 1px;
+  flex-shrink: 0;
 }
 
 .remove-custom-query {
