@@ -53,6 +53,14 @@ const MAX_SEARCH_HISTORY = 10;
 // Store per-PDF search queries (filePath -> query string)
 const perPdfSearchQueries = new Map<string, string>();
 
+// Store pinned results (filePath -> {queries, matches})
+interface PinnedResult {
+  queries: QueryItem[];
+  matches: SearchMatch[];
+  timestamp: number;
+}
+const pinnedResults = new Map<string, PinnedResult>();
+
 // DOM Elements
 let searchForm: HTMLFormElement;
 let searchQueriesContainer: HTMLElement;
@@ -116,6 +124,52 @@ function saveSearchToHistory(queries: QueryItem[]) {
 
 function clearSearchHistory() {
   localStorage.removeItem('pdfSearchHistory');
+}
+
+function savePinnedResults() {
+  const pinnedArray = Array.from(pinnedResults.entries()).map(([filePath, data]) => ({
+    filePath,
+    ...data
+  }));
+  localStorage.setItem('pdfPinnedResults', JSON.stringify(pinnedArray));
+}
+
+function loadPinnedResults() {
+  const stored = localStorage.getItem('pdfPinnedResults');
+  if (!stored) return;
+  try {
+    const pinnedArray = JSON.parse(stored);
+    pinnedArray.forEach((item: any) => {
+      pinnedResults.set(item.filePath, {
+        queries: item.queries,
+        matches: item.matches,
+        timestamp: item.timestamp
+      });
+    });
+  } catch (error) {
+    console.error('Failed to load pinned results:', error);
+  }
+}
+
+function togglePinResult(filePath: string) {
+  if (pinnedResults.has(filePath)) {
+    // Unpin
+    pinnedResults.delete(filePath);
+  } else {
+    // Pin - get all matches for this file
+    const fileMatches = currentResults.filter(m => m.file_path === filePath);
+    if (fileMatches.length > 0) {
+      const currentQueries = getAllQueries();
+      pinnedResults.set(filePath, {
+        queries: currentQueries,
+        matches: fileMatches,
+        timestamp: Date.now()
+      });
+    }
+  }
+  savePinnedResults();
+  // Re-render results to reflect pinned state
+  renderResults(currentResults);
 }
 
 function addSearchQueryItem(queryType: 'parallel' | 'filter' = 'parallel') {
@@ -258,8 +312,116 @@ function toggleZoteroFolder() {
   }
 }
 
+function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned: boolean, originalQueries?: QueryItem[]): string {
+  const fileName = fileMatches[0].file_name;
+  const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
+  const firstMatch = fileMatches[0];
+  const zoteroMetadata = firstMatch.zotero_metadata;
+
+  // Create original search term display
+  const originalSearchDisplay = isPinned && originalQueries
+    ? `<span class="original-search-term">Original: ${originalQueries.map(q => q.query).join(', ')}</span>`
+    : '';
+
+  // Determine pin button state
+  const pinButtonClass = isPinned ? 'pin-btn pinned' : 'pin-btn';
+  const pinButtonIcon = isPinned ? '📌' : '📍';
+  const pinButtonTitle = isPinned ? 'Unpin this result' : 'Pin this result';
+
+  // Add pinned header class if needed
+  const headerClass = isPinned ? 'result-file-header pinned-header' : 'result-file-header';
+
+  let html = `
+    <div class="result-file ${isPinned ? 'pinned' : ''}">
+      <div class="${headerClass}">
+        <div class="result-file-header-content">
+          ${zoteroMetadata ? `
+            <div class="zotero-header-title">
+              <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
+            </div>
+            ${zoteroMetadata.year || zoteroMetadata.authors ? `
+              <div class="zotero-authors-year">
+                ${zoteroMetadata.year ? escapeHtml(zoteroMetadata.year) : ''}
+                ${zoteroMetadata.authors ? `${zoteroMetadata.year ? ' - ' : ''}${escapeHtml(zoteroMetadata.authors)}` : ''}
+              </div>
+            ` : ''}
+            <div class="result-file-header-buttons">
+              ${originalSearchDisplay}
+              <button class="${pinButtonClass}" data-filepath="${escapeHtml(filePath)}" title="${pinButtonTitle}">${pinButtonIcon}</button>
+              <button class="btn-icon result-matches-toggle" data-fileid="${fileId}" data-pinned="${isPinned}">
+                <span>✓ Matches (${fileMatches.length})</span>
+                <span class="result-matches-toggle-arrow">►</span>
+              </button>
+              <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
+              <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
+              <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
+              <div class="pdf-search-input-container" data-fileid="${fileId}">
+                <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
+              </div>
+            </div>
+          ` : `
+            <div class="result-file-header-title">
+              <h3>${fileName}</h3>
+              <div class="result-file-header-buttons">
+                ${originalSearchDisplay}
+                <button class="${pinButtonClass}" data-filepath="${escapeHtml(filePath)}" title="${pinButtonTitle}">${pinButtonIcon}</button>
+                <button class="btn-icon result-matches-toggle" data-fileid="${fileId}" data-pinned="${isPinned}">
+                  <span>✓ Matches (${fileMatches.length})</span>
+                  <span class="result-matches-toggle-arrow">►</span>
+                </button>
+                <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
+                <div class="pdf-search-input-container" data-fileid="${fileId}">
+                  <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                  <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
+                </div>
+              </div>
+            </div>
+            <div class="result-file-path">${filePath}</div>
+          `}
+        </div>
+      </div>
+      <div class="result-matches" id="matches-${fileId}">
+  `;
+
+  // Group matches by page within this file
+  const pageGroups = new Map<number, SearchMatch[]>();
+  fileMatches.forEach(match => {
+    if (!pageGroups.has(match.page_number)) {
+      pageGroups.set(match.page_number, []);
+    }
+    pageGroups.get(match.page_number)!.push(match);
+  });
+
+  // Render each page once with all its matches
+  pageGroups.forEach((pageMatches, pageNumber) => {
+    const pageId = `page-${fileId}-${pageNumber}`;
+    const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+      ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+      : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
+    html += `
+      <div class="result-match">
+        <div class="result-match-header">${pageHeader}</div>
+        <div class="page-preview" id="${pageId}">
+          <div class="page-preview-loading">Loading page preview...</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
 function renderResults(matches: SearchMatch[]) {
-  if (matches.length === 0) {
+  // Always show pinned results, even if no new matches
+  const hasPinnedResults = pinnedResults.size > 0;
+
+  if (matches.length === 0 && !hasPinnedResults) {
     resultsContainer.innerHTML = `
       <div class="empty-state">
         <p>No matches found</p>
@@ -270,10 +432,11 @@ function renderResults(matches: SearchMatch[]) {
     return;
   }
 
-  resultsCount.textContent = `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`;
+  const totalMatches = matches.length + Array.from(pinnedResults.values()).reduce((sum, p) => sum + p.matches.length, 0);
+  resultsCount.textContent = `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'}`;
   exportLink.classList.remove('disabled');
 
-  // Group matches by file
+  // Group current matches by file
   const fileGroups = new Map<string, SearchMatch[]>();
   matches.forEach(match => {
     if (!fileGroups.has(match.file_path)) {
@@ -282,98 +445,19 @@ function renderResults(matches: SearchMatch[]) {
     fileGroups.get(match.file_path)!.push(match);
   });
 
-  // Render grouped results
+  // Render grouped results - pinned first, then current results
   let html = '';
+
+  // Render pinned results first
+  pinnedResults.forEach((pinnedData, filePath) => {
+    html += renderFileGroup(filePath, pinnedData.matches, true, pinnedData.queries);
+  });
+
+  // Render current results (excluding already pinned files)
   fileGroups.forEach((fileMatches, filePath) => {
-    const fileName = fileMatches[0].file_name;
-    const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
-
-    const firstMatch = fileMatches[0];
-    const zoteroMetadata = firstMatch.zotero_metadata;
-
-    // Debug: log zotero metadata
-    if (zoteroMetadata) {
-      console.log('Zotero metadata for', fileName, ':', zoteroMetadata);
+    if (!pinnedResults.has(filePath)) {
+      html += renderFileGroup(filePath, fileMatches, false);
     }
-
-    html += `
-      <div class="result-file">
-        <div class="result-file-header">
-          <div class="result-file-header-content">
-            ${zoteroMetadata ? `
-              <div class="zotero-header-title">
-                <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
-              </div>
-              ${zoteroMetadata.year || zoteroMetadata.authors ? `
-                <div class="zotero-authors-year">
-                  ${zoteroMetadata.year ? escapeHtml(zoteroMetadata.year) : ''}
-                  ${zoteroMetadata.authors ? `${zoteroMetadata.year ? ' - ' : ''}${escapeHtml(zoteroMetadata.authors)}` : ''}
-                </div>
-              ` : ''}
-              <div class="result-file-header-buttons">
-                <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
-                  <span>✓ Matches (${fileMatches.length})</span>
-                  <span class="result-matches-toggle-arrow">►</span>
-                </button>
-                <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
-                <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
-                <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
-                <div class="pdf-search-input-container" data-fileid="${fileId}">
-                  <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
-                  <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
-                </div>
-              </div>
-            ` : `
-              <div class="result-file-header-title">
-                <h3>${fileName}</h3>
-                <div class="result-file-header-buttons">
-                  <button class="btn-icon result-matches-toggle" data-fileid="${fileId}">
-                    <span>✓ Matches (${fileMatches.length})</span>
-                    <span class="result-matches-toggle-arrow">►</span>
-                  </button>
-                  <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
-                  <div class="pdf-search-input-container" data-fileid="${fileId}">
-                    <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
-                    <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
-                  </div>
-                </div>
-              </div>
-              <div class="result-file-path">${filePath}</div>
-            `}
-          </div>
-        </div>
-        <div class="result-matches" id="matches-${fileId}">
-    `;
-
-    // Group matches by page within this file
-    const pageGroups = new Map<number, SearchMatch[]>();
-    fileMatches.forEach(match => {
-      if (!pageGroups.has(match.page_number)) {
-        pageGroups.set(match.page_number, []);
-      }
-      pageGroups.get(match.page_number)!.push(match);
-    });
-
-    // Render each page once with all its matches
-    pageGroups.forEach((pageMatches, pageNumber) => {
-      const pageId = `page-${fileId}-${pageNumber}`;
-      const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
-        ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
-        : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
-      html += `
-        <div class="result-match">
-          <div class="result-match-header">${pageHeader}</div>
-          <div class="page-preview" id="${pageId}">
-            <div class="page-preview-loading">Loading page preview...</div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-        </div>
-      </div>
-    `;
   });
 
   resultsContainer.innerHTML = html;
@@ -382,6 +466,17 @@ function renderResults(matches: SearchMatch[]) {
   const savedColumnLayout = localStorage.getItem('pdfSearchColumnLayout') || '1';
   document.querySelectorAll('.result-matches').forEach(matches => {
     matches.classList.add(`columns-${savedColumnLayout}`);
+  });
+
+  // Set up event listeners for pin buttons
+  document.querySelectorAll('.pin-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const filePath = (btn as HTMLButtonElement).dataset.filepath;
+      if (filePath) {
+        togglePinResult(filePath);
+      }
+    });
   });
 
   // Set up event listeners for show cover buttons
@@ -437,6 +532,7 @@ function renderResults(matches: SearchMatch[]) {
     toggle.addEventListener('click', (e) => {
       e.preventDefault();
       const fileId = (toggle as HTMLElement).dataset.fileid;
+      const isPinned = (toggle as HTMLElement).dataset.pinned === 'true';
       const matchesContainer = document.getElementById(`matches-${fileId}`);
       const arrow = toggle.querySelector('.result-matches-toggle-arrow');
       const searchInputContainer = document.querySelector(`.pdf-search-input-container[data-fileid="${fileId}"]`);
@@ -452,8 +548,60 @@ function renderResults(matches: SearchMatch[]) {
             searchInputContainer.classList.add('visible');
           }
 
-          // Load pages normally
-          const queries = getAllQueries();
+          // Determine which queries to use for highlighting
+          let queriesToUse = getAllQueries();
+
+          // If this is a pinned result, combine original queries with current queries
+          if (isPinned) {
+            const pageElements = matchesContainer.querySelectorAll('.page-preview');
+            if (pageElements.length > 0) {
+              const firstPageId = pageElements[0].id;
+              const match = firstPageId.match(/page-(.+)-(\d+)$/);
+              if (match) {
+                const filePathKey = match[1];
+
+                // Find the actual file path
+                let actualFilePath: string | null = null;
+                for (const [filePath] of fileGroups.entries()) {
+                  if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
+                    actualFilePath = filePath;
+                    break;
+                  }
+                }
+
+                // Also check pinned results
+                if (!actualFilePath) {
+                  for (const [filePath] of pinnedResults.entries()) {
+                    if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
+                      actualFilePath = filePath;
+                      break;
+                    }
+                  }
+                }
+
+                // If we found the file path and it's pinned, combine queries
+                if (actualFilePath && pinnedResults.has(actualFilePath)) {
+                  const pinnedData = pinnedResults.get(actualFilePath)!;
+                  const currentQueries = getAllQueries();
+
+                  // Combine original and current queries, avoiding duplicates
+                  const combinedQueriesMap = new Map<string, QueryItem>();
+                  pinnedData.queries.forEach(q => {
+                    combinedQueriesMap.set(q.query, q);
+                  });
+                  currentQueries.forEach(q => {
+                    if (!combinedQueriesMap.has(q.query)) {
+                      combinedQueriesMap.set(q.query, q);
+                    }
+                  });
+
+                  queriesToUse = Array.from(combinedQueriesMap.values());
+                }
+              }
+            }
+          }
+
+          // Load pages with appropriate queries
           const pageElements = matchesContainer.querySelectorAll('.page-preview');
           pageElements.forEach((pageElement) => {
             const pageId = pageElement.id;
@@ -462,21 +610,35 @@ function renderResults(matches: SearchMatch[]) {
               const filePathKey = match[1];
               const pageNumber = parseInt(match[2]);
 
-              // Find the actual file path from fileGroups
+              // Find the actual file path from fileGroups or pinnedResults
+              let foundFilePath: string | null = null;
               for (const [filePath] of fileGroups.entries()) {
                 if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
-                  loadPageImage(filePath, pageNumber, queries)
-                    .then(canvas => {
-                      if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
-                        pageElement.innerHTML = '';
-                        pageElement.appendChild(canvas);
-                      }
-                    })
-                    .catch(() => {
-                      pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
-                    });
+                  foundFilePath = filePath;
                   break;
                 }
+              }
+
+              if (!foundFilePath) {
+                for (const [filePath] of pinnedResults.entries()) {
+                  if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
+                    foundFilePath = filePath;
+                    break;
+                  }
+                }
+              }
+
+              if (foundFilePath) {
+                loadPageImage(foundFilePath, pageNumber, queriesToUse)
+                  .then(canvas => {
+                    if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
+                      pageElement.innerHTML = '';
+                      pageElement.appendChild(canvas);
+                    }
+                  })
+                  .catch(() => {
+                    pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                  });
               }
             }
           });
@@ -567,7 +729,7 @@ function renderResults(matches: SearchMatch[]) {
               });
 
               // Add per-PDF results (for pages not already included)
-              perPdfResults.forEach(result => {
+              perPdfResults.forEach((result: SearchMatch) => {
                 if (!pageSet.has(result.page_number)) {
                   pageSet.add(result.page_number);
                   mergedResults.push(result);
@@ -1256,6 +1418,14 @@ window.addEventListener("DOMContentLoaded", () => {
   statusMessage = document.querySelector("#status-message")!;
   resultsCount = document.querySelector("#results-count")!;
   resultsContainer = document.querySelector("#results-container")!;
+
+  // Load pinned results from localStorage
+  loadPinnedResults();
+
+  // Render pinned results if any exist
+  if (pinnedResults.size > 0) {
+    renderResults([]);
+  }
 
   // Load persisted settings
   const savedDirectory = localStorage.getItem('pdfSearchDirectory');

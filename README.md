@@ -7,6 +7,12 @@ A modern desktop application built with Tauri v2 for searching text across multi
 - **Modern UI**: Clean sidebar + main panel layout with dark mode support
 - **Fast Search**: Rust-powered backend with parallel PDF processing
 - **Visual Results**: Grouped results by file with sticky headers and accordion expansion
+- **Result Pinning**: Pin important search results to keep them at the top across searches
+  - Pin button appears in each result header (gray outline when unpinned, blue filled when pinned)
+  - Pinned items persist even when new searches are run
+  - Shows original search term that matched the pinned result
+  - Highlights both original and current search terms when viewing matches
+  - Pinned results have distinctive light gray header background
 - **Multi-Word Search**: Search for phrases across PDFs where spaces are stripped
 - **PDF Page Preview**: Renders actual PDF pages with search terms highlighted (using PDF.js)
 - **Cover Page Display**: Toggle to view the first page of any PDF with one click
@@ -99,7 +105,10 @@ The compiled app will be in `src-tauri/target/release/bundle/`.
 4. **Search**: Click the "Search" button
 5. **View Results**:
    - Results appear grouped by file with sticky headers
+   - Click the pin button (📍) to pin important results to the top
+   - Pinned results (📌) stay at the top and show the original search term
    - Click "Matches (N)" to expand/collapse match details (lazy-loads pages if needed)
+   - For pinned items, highlights show both original and current search terms
    - Click "📖 Cover" to toggle display of the PDF's first page
    - In Zotero mode, click "📋 Citation" to copy formatted citation to clipboard
    - Click "📖 Zotero" to open the PDF directly in Zotero at the first match page
@@ -214,6 +223,8 @@ The UI features:
 - [x] Lazy-loading of PDF previews
 - [x] Smart highlighting (no highlight on empty query)
 - [x] Full-width result layout
+- [x] Result pinning with original search term tracking
+- [x] Combined highlighting for pinned results (original + current search)
 
 ## Future Enhancements
 

@@ -655,6 +655,62 @@ body {
   background-color: var(--secondary-hover);
 }
 
+/* Pin Button Styles */
+.pin-btn {
+  padding: 6px 12px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.pin-btn:hover {
+  opacity: 1;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.pin-btn.pinned {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+  opacity: 1;
+}
+
+.pin-btn.pinned:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+/* Original Search Term Display */
+.original-search-term {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 4px 8px;
+  background-color: var(--background);
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* Pinned Result Header Styles */
+.result-file-header.pinned-header {
+  background-color: #f1f5f9; /* Light gray background */
+  border-bottom: 2px solid var(--primary-color);
+}
+
+.result-file.pinned {
+  border-left: 4px solid var(--primary-color);
+}
+
 .result-file-path {
   font-size: 12px;
   color: var(--text-secondary);
@@ -955,5 +1011,10 @@ body {
 
   .page-preview-error {
     color: #fca5a5;
+  }
+
+  .result-file-header.pinned-header {
+    background-color: #334155; /* Dark gray background for pinned headers in dark mode */
+    border-bottom: 2px solid var(--primary-color);
   }
 }
