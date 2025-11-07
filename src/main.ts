@@ -80,6 +80,34 @@ let resultsContainer: HTMLElement;
 
 let queryCount = 1;
 
+// Color palette for multiple search terms - 10 bright, easily distinguishable colors
+const COLOR_PALETTE = [
+  '#ffff00', // Yellow - reserved for first/original search
+  '#22c55e', // Green - reserved for filter searches
+  '#3b82f6', // Bright Blue
+  '#f97316', // Orange
+  '#ec4899', // Pink
+  '#8b5cf6', // Purple
+  '#06b6d4', // Cyan
+  '#f59e0b', // Amber
+  '#14b8a6', // Teal
+  '#a855f7', // Violet
+];
+
+function getColorForQuery(index: number, queryType: 'parallel' | 'filter'): string {
+  if (queryType === 'filter') {
+    return COLOR_PALETTE[1]; // Green for all filters
+  }
+
+  if (index === 0) {
+    return COLOR_PALETTE[0]; // Yellow for first parallel query
+  }
+
+  // For additional parallel queries, cycle through the palette starting from index 2
+  const paletteIndex = ((index - 1) % (COLOR_PALETTE.length - 2)) + 2;
+  return COLOR_PALETTE[paletteIndex];
+}
+
 function showStatus(message: string, type: 'info' | 'error' | 'success') {
   statusMessage.textContent = message;
   statusMessage.className = type;
@@ -179,8 +207,14 @@ function addSearchQueryItem(queryType: 'parallel' | 'filter' = 'parallel') {
   const container = searchQueriesContainer;
   const index = queryCount++;
 
-  // Default colors: yellow for parallel, green for filter
-  const defaultColor = queryType === 'parallel' ? '#ffff00' : '#22c55e';
+  // Count existing queries to determine color index
+  const existingQueries = container.querySelectorAll('.search-query-item');
+  const parallelCount = Array.from(existingQueries).filter(
+    (item) => (item as HTMLElement).dataset.queryType === 'parallel'
+  ).length;
+
+  // Get color from palette based on query type and count
+  const defaultColor = getColorForQuery(parallelCount, queryType);
 
   const queryItem = document.createElement('div');
   queryItem.className = queryType === 'filter' ? 'search-query-item filter-type' : 'search-query-item';
@@ -409,7 +443,7 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
             }).length;
             return `
             <div class="result-matches-query-filter">
-              <input type="checkbox" id="query-filter-original-${fileId}-${i}" data-query-type="original" data-query="${escapeHtml(q.query)}" checked />
+              <input type="checkbox" id="query-filter-original-${fileId}-${i}" data-query-type="original" data-query="${escapeHtml(q.query)}" data-color="${q.color}" checked />
               <label for="query-filter-original-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
             </div>
           `;
@@ -427,7 +461,7 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
               }).length;
               return `
               <div class="result-matches-query-filter">
-                <input type="checkbox" id="query-filter-current-${fileId}-${i}" data-query-type="current" data-query="${escapeHtml(q.query)}" checked />
+                <input type="checkbox" id="query-filter-current-${fileId}-${i}" data-query-type="current" data-query="${escapeHtml(q.query)}" data-color="${q.color}" checked />
                 <label for="query-filter-current-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
               </div>
             `;
@@ -758,6 +792,11 @@ function renderResults(matches: SearchMatch[]) {
             // Show loading state
             matchesContainer.innerHTML = '<div class="page-preview-loading">Searching...</div>';
 
+            // Get all current queries to determine the next color
+            const allCurrentQueries = getAllQueries();
+            const nextColorIndex = allCurrentQueries.length;
+            const customQueryColor = getColorForQuery(nextColorIndex, 'parallel');
+
             // Search for this specific query to get match count
             try {
               const customQueryParams: SearchParams = {
@@ -765,7 +804,7 @@ function renderResults(matches: SearchMatch[]) {
                   query: searchQuery,
                   use_regex: false,
                   query_type: 'parallel',
-                  color: '#0080ff'
+                  color: customQueryColor
                 }],
                 directory: filePath,
                 context_words: 100,
@@ -782,7 +821,7 @@ function renderResults(matches: SearchMatch[]) {
                 const filterDiv = document.createElement('div');
                 filterDiv.className = 'result-matches-query-filter custom-query';
                 filterDiv.innerHTML = `
-                  <input type="checkbox" id="${checkboxId}" data-query-type="custom" data-query="${escapeHtml(searchQuery)}" checked />
+                  <input type="checkbox" id="${checkboxId}" data-query-type="custom" data-query="${escapeHtml(searchQuery)}" data-color="${customQueryColor}" checked />
                   <label for="${checkboxId}">${escapeHtml(searchQuery)} - ${matchCount} <a href="#" class="remove-custom-query" data-checkbox-id="${checkboxId}">(Remove)</a></label>
                 `;
                 filtersContainer.appendChild(filterDiv);
@@ -804,13 +843,15 @@ function renderResults(matches: SearchMatch[]) {
               // Now get all checked queries and render with them
               const checkedQueries: QueryItem[] = [];
               filterBar.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                const query = (cb as HTMLInputElement).dataset.query;
+                const checkbox = cb as HTMLInputElement;
+                const query = checkbox.dataset.query;
+                const color = checkbox.dataset.color || '#ffff00'; // Fallback to yellow if no color
                 if (query) {
                   checkedQueries.push({
                     query: query,
                     use_regex: false,
                     query_type: 'parallel',
-                    color: '#0080ff'
+                    color: color
                   });
                 }
               });
@@ -964,13 +1005,15 @@ function renderResults(matches: SearchMatch[]) {
 
         const checkedQueries: QueryItem[] = [];
         filterBar.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-          const query = (cb as HTMLInputElement).dataset.query;
+          const checkbox = cb as HTMLInputElement;
+          const query = checkbox.dataset.query;
+          const color = checkbox.dataset.color || '#ffff00'; // Fallback to yellow if no color
           if (query) {
             checkedQueries.push({
               query: query,
               use_regex: false,
               query_type: 'parallel',
-              color: '#ffff00'
+              color: color
             });
           }
         });
