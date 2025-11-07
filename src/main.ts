@@ -62,7 +62,7 @@ let zoteroPath: HTMLElement;
 let browseZoteroBtn: HTMLButtonElement;
 let zoteroFolderGroup: HTMLElement;
 let searchBtn: HTMLButtonElement;
-let exportBtn: HTMLButtonElement;
+let exportLink: HTMLAnchorElement;
 let statusMessage: HTMLElement;
 let resultsCount: HTMLElement;
 let resultsContainer: HTMLElement;
@@ -263,12 +263,12 @@ function renderResults(matches: SearchMatch[]) {
       </div>
     `;
     resultsCount.textContent = '';
-    exportBtn.disabled = true;
+    exportLink.classList.add('disabled');
     return;
   }
 
   resultsCount.textContent = `${matches.length} ${matches.length === 1 ? 'match' : 'matches'}`;
-  exportBtn.disabled = false;
+  exportLink.classList.remove('disabled');
 
   // Group matches by file
   const fileGroups = new Map<string, SearchMatch[]>();
@@ -942,7 +942,7 @@ window.addEventListener("DOMContentLoaded", () => {
   browseZoteroBtn = document.querySelector("#browse-zotero-btn")!;
   zoteroFolderGroup = document.querySelector("#zotero-folder-group")!;
   searchBtn = document.querySelector("#search-btn")!;
-  exportBtn = document.querySelector("#export-btn")!;
+  exportLink = document.querySelector("#export-link")!;
   statusMessage = document.querySelector("#status-message")!;
   resultsCount = document.querySelector("#results-count")!;
   resultsContainer = document.querySelector("#results-container")!;
@@ -987,7 +987,27 @@ window.addEventListener("DOMContentLoaded", () => {
   searchForm.addEventListener("submit", performSearch);
   browseBtn.addEventListener("click", browseDirectory);
   browseZoteroBtn.addEventListener("click", browseZoteroDirectory);
-  exportBtn.addEventListener("click", copyResults);
+  exportLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!exportLink.classList.contains('disabled')) {
+      copyResults();
+    }
+  });
+
+  // Column layout icons event handlers
+  document.querySelectorAll('.column-icon').forEach(icon => {
+    icon.addEventListener('click', () => {
+      // Remove active class from all icons
+      document.querySelectorAll('.column-icon').forEach(i => i.classList.remove('active'));
+      // Add active class to clicked icon
+      icon.classList.add('active');
+
+      // Get the number of columns
+      const columns = (icon as HTMLElement).dataset.columns;
+      console.log(`Column layout changed to: ${columns} column(s)`);
+      // TODO: Implement actual column layout functionality
+    });
+  });
 
   // Add search term button
   addSearchTermBtn.addEventListener("click", (e) => {

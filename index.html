@@ -77,10 +77,6 @@
           <button type="submit" class="btn-primary" id="search-btn">
             Search
           </button>
-
-          <button type="button" class="btn-secondary" id="export-btn" disabled>
-            Copy Results
-          </button>
         </form>
 
         <div id="status-message"></div>
@@ -88,6 +84,25 @@
 
       <!-- Main Panel -->
       <main class="main-panel">
+        <!-- Fixed Top Bar for Results Visualization Options -->
+        <div class="results-topbar">
+          <div class="column-layout-controls">
+            <span class="column-icon active" data-columns="1" title="Single column">
+              <span class="icon-bar"></span>
+            </span>
+            <span class="column-icon" data-columns="2" title="Double column">
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </span>
+            <span class="column-icon" data-columns="3" title="Triple column">
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </span>
+          </div>
+          <a href="#" id="export-link" class="export-link disabled">Copy Results</a>
+        </div>
+
         <div class="results-header">
           <h2>Search Results</h2>
           <span id="results-count" class="results-count"></span>
