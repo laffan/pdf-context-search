@@ -872,32 +872,50 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
           const searchLower = searchQuery.toLowerCase();
 
           for (const item of textContent.items) {
-            if ('str' in item && item.str.toLowerCase().includes(searchLower)) {
-              // Get the transform matrix [a, b, c, d, e, f]
-              const tx = item.transform;
+            if ('str' in item) {
+              const itemText = item.str;
+              const itemTextLower = itemText.toLowerCase();
 
-              // Calculate the bounding box in PDF coordinates
-              // The transform gives us position and scale
-              const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
-              const fontWidth = item.width;
+              // Find all occurrences of the search term in this text item
+              let matchIndex = 0;
+              while ((matchIndex = itemTextLower.indexOf(searchLower, matchIndex)) !== -1) {
+                // Get the transform matrix [a, b, c, d, e, f]
+                const tx = item.transform;
 
-              // Convert PDF coordinates to viewport coordinates
-              const left = tx[4];
-              const bottom = tx[5];
-              const right = left + fontWidth;
-              const top = bottom + fontHeight;
+                // Calculate the bounding box in PDF coordinates
+                const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
+                const totalWidth = item.width;
+                const textLength = itemText.length;
 
-              // Transform to viewport space
-              const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
-              const [x2, y2] = viewport.convertToViewportPoint(right, top);
+                // Estimate character width (simple approximation)
+                const charWidth = textLength > 0 ? totalWidth / textLength : 0;
 
-              // Draw the highlight rectangle
-              const rectX = Math.min(x1, x2);
-              const rectY = Math.min(y1, y2);
-              const rectWidth = Math.abs(x2 - x1);
-              const rectHeight = Math.abs(y2 - y1);
+                // Calculate the start position and width of just the matched text
+                const matchLength = searchQuery.length;
+                const matchStartOffset = matchIndex * charWidth;
+                const matchWidth = matchLength * charWidth;
 
-              context.fillRect(rectX, rectY, rectWidth, rectHeight);
+                // Convert PDF coordinates to viewport coordinates
+                const left = tx[4] + matchStartOffset;
+                const bottom = tx[5];
+                const right = left + matchWidth;
+                const top = bottom + fontHeight;
+
+                // Transform to viewport space
+                const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
+                const [x2, y2] = viewport.convertToViewportPoint(right, top);
+
+                // Draw the highlight rectangle for just the matched portion
+                const rectX = Math.min(x1, x2);
+                const rectY = Math.min(y1, y2);
+                const rectWidth = Math.abs(x2 - x1);
+                const rectHeight = Math.abs(y2 - y1);
+
+                context.fillRect(rectX, rectY, rectWidth, rectHeight);
+
+                // Move to next potential match
+                matchIndex += searchQuery.length;
+              }
             }
           }
         }
