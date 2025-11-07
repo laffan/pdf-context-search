@@ -140,11 +140,14 @@ function loadPinnedResults() {
   try {
     const pinnedArray = JSON.parse(stored);
     pinnedArray.forEach((item: any) => {
-      pinnedResults.set(item.filePath, {
-        queries: item.queries,
-        matches: item.matches,
-        timestamp: item.timestamp
-      });
+      // Only load pinned results that have matches
+      if (item.matches && item.matches.length > 0) {
+        pinnedResults.set(item.filePath, {
+          queries: item.queries,
+          matches: item.matches,
+          timestamp: item.timestamp
+        });
+      }
     });
   } catch (error) {
     console.error('Failed to load pinned results:', error);
@@ -266,6 +269,44 @@ function getAllQueries(): QueryItem[] {
   return queries;
 }
 
+function getActiveQueryFilters(fileId: string): { original: QueryItem[], current: QueryItem[] } {
+  const original: QueryItem[] = [];
+  const current: QueryItem[] = [];
+
+  const matchesContainer = document.getElementById(`matches-${fileId}`);
+  if (!matchesContainer) return { original, current };
+
+  // Get checked original queries
+  const originalCheckboxes = matchesContainer.querySelectorAll('input[data-query-type="original"]:checked') as NodeListOf<HTMLInputElement>;
+  originalCheckboxes.forEach(checkbox => {
+    const query = checkbox.dataset.query;
+    if (query) {
+      original.push({
+        query: query,
+        use_regex: false,
+        query_type: 'parallel',
+        color: '#ffff00'
+      });
+    }
+  });
+
+  // Get checked current queries
+  const currentCheckboxes = matchesContainer.querySelectorAll('input[data-query-type="current"]:checked') as NodeListOf<HTMLInputElement>;
+  currentCheckboxes.forEach(checkbox => {
+    const query = checkbox.dataset.query;
+    if (query) {
+      current.push({
+        query: query,
+        use_regex: false,
+        query_type: 'parallel',
+        color: '#22c55e'
+      });
+    }
+  });
+
+  return { original, current };
+}
+
 async function browseDirectory() {
   try {
     const selected = await open({
@@ -313,6 +354,11 @@ function toggleZoteroFolder() {
 }
 
 function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned: boolean, originalQueries?: QueryItem[]): string {
+  // Safety check: don't render if no matches
+  if (!fileMatches || fileMatches.length === 0) {
+    return '';
+  }
+
   const fileName = fileMatches[0].file_name;
   const fileId = filePath.replace(/[^a-zA-Z0-9]/g, '_');
   const firstMatch = fileMatches[0];
@@ -355,10 +401,6 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
               <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
               <button class="btn-icon copy-citation-btn" data-citekey="${escapeHtml(zoteroMetadata.citekey)}" data-link="${escapeHtml(zoteroMetadata.zotero_link)}">📋 Copy Citekey Link</button>
               <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
-              <div class="pdf-search-input-container" data-fileid="${fileId}">
-                <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
-                <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
-              </div>
             </div>
           ` : `
             <div class="result-file-header-title">
@@ -370,14 +412,27 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
                   <span class="result-matches-toggle-arrow">►</span>
                 </button>
                 <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
-                <div class="pdf-search-input-container" data-fileid="${fileId}">
-                  <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
-                  <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
-                </div>
               </div>
             </div>
             <div class="result-file-path">${filePath}</div>
           `}
+        </div>
+      </div>
+      <div class="result-matches-filter" id="filter-${fileId}">
+        <input type="text" class="result-matches-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+        <div class="result-matches-query-filters">
+          ${isPinned && originalQueries ? originalQueries.map((q, i) => `
+            <div class="result-matches-query-filter">
+              <input type="checkbox" id="query-filter-original-${fileId}-${i}" data-query-type="original" data-query="${escapeHtml(q.query)}" checked />
+              <label for="query-filter-original-${fileId}-${i}">${escapeHtml(q.query)}</label>
+            </div>
+          `).join('') : ''}
+          ${getAllQueries().map((q, i) => `
+            <div class="result-matches-query-filter">
+              <input type="checkbox" id="query-filter-current-${fileId}-${i}" data-query-type="current" data-query="${escapeHtml(q.query)}" checked />
+              <label for="query-filter-current-${fileId}-${i}">${escapeHtml(q.query)}</label>
+            </div>
+          `).join('')}
         </div>
       </div>
       <div class="result-matches" id="matches-${fileId}">
@@ -533,8 +588,8 @@ function renderResults(matches: SearchMatch[]) {
       const fileId = (toggle as HTMLElement).dataset.fileid;
       const isPinned = (toggle as HTMLElement).dataset.pinned === 'true';
       const matchesContainer = document.getElementById(`matches-${fileId}`);
+      const filterBar = document.getElementById(`filter-${fileId}`);
       const arrow = toggle.querySelector('.result-matches-toggle-arrow');
-      const searchInputContainer = document.querySelector(`.pdf-search-input-container[data-fileid="${fileId}"]`);
 
       if (matchesContainer && arrow) {
         const isOpen = matchesContainer.classList.contains('open');
@@ -543,8 +598,8 @@ function renderResults(matches: SearchMatch[]) {
           // Opening - load pages
           matchesContainer.classList.add('open');
           arrow.classList.add('open');
-          if (searchInputContainer) {
-            searchInputContainer.classList.add('visible');
+          if (filterBar) {
+            filterBar.classList.add('visible');
           }
 
           // Determine which queries to use for highlighting
@@ -645,18 +700,18 @@ function renderResults(matches: SearchMatch[]) {
           // Closing - clear per-PDF search
           matchesContainer.classList.remove('open');
           arrow.classList.remove('open');
-          if (searchInputContainer) {
-            searchInputContainer.classList.remove('visible');
+          if (filterBar) {
+            filterBar.classList.remove('visible');
+          }
 
-            // Clear the per-PDF search input and stored query
-            const searchInput = searchInputContainer.querySelector('.pdf-search-input') as HTMLInputElement;
-            if (searchInput) {
-              const filePath = searchInput.dataset.filepath;
-              if (filePath) {
-                perPdfSearchQueries.delete(filePath);
-              }
-              searchInput.value = '';
+          // Clear the per-PDF search input and stored query
+          const searchInput = filterBar?.querySelector('.result-matches-search-input') as HTMLInputElement;
+          if (searchInput) {
+            const filePath = searchInput.dataset.filepath;
+            if (filePath) {
+              perPdfSearchQueries.delete(filePath);
             }
+            searchInput.value = '';
           }
         }
       }
@@ -664,7 +719,7 @@ function renderResults(matches: SearchMatch[]) {
   });
 
   // Set up event listeners for per-PDF search inputs
-  document.querySelectorAll('.pdf-search-input').forEach(input => {
+  document.querySelectorAll('.result-matches-search-input').forEach(input => {
     input.addEventListener('keydown', async (e: Event) => {
       const keyEvent = e as KeyboardEvent;
       if (keyEvent.key === 'Enter') {
@@ -676,16 +731,10 @@ function renderResults(matches: SearchMatch[]) {
 
         if (filePath && fileId) {
           const matchesContainer = document.getElementById(`matches-${fileId}`);
-          const statusSpan = document.querySelector(`.pdf-search-status[data-fileid="${fileId}"]`) as HTMLElement;
 
           if (searchQuery) {
             // Store the per-PDF query
             perPdfSearchQueries.set(filePath, searchQuery);
-
-            // Show status text
-            if (statusSpan) {
-              statusSpan.classList.add('visible');
-            }
 
             // Show loading state
             if (matchesContainer) {
@@ -711,23 +760,31 @@ function renderResults(matches: SearchMatch[]) {
 
               const perPdfResults = await invoke<SearchMatch[]>('search_single_pdf_file', { params });
 
-              // Merge with existing results for this file from currentResults
-              // Get existing results for this file from the original search
-              const existingResults = currentResults.filter(m => m.file_path === filePath);
-
               // Combine results and remove duplicates by page number
               const pageSet = new Set<number>();
               const mergedResults: SearchMatch[] = [];
 
-              // Add existing results
-              existingResults.forEach(result => {
+              // 1. Add results from current search
+              const currentSearchResults = currentResults.filter(m => m.file_path === filePath);
+              currentSearchResults.forEach(result => {
                 if (!pageSet.has(result.page_number)) {
                   pageSet.add(result.page_number);
                   mergedResults.push(result);
                 }
               });
 
-              // Add per-PDF results (for pages not already included)
+              // 2. Add results from original pinned search (if this PDF is pinned)
+              if (pinnedResults.has(filePath)) {
+                const pinnedData = pinnedResults.get(filePath)!;
+                pinnedData.matches.forEach(result => {
+                  if (!pageSet.has(result.page_number)) {
+                    pageSet.add(result.page_number);
+                    mergedResults.push(result);
+                  }
+                });
+              }
+
+              // 3. Add per-PDF search results (for pages not already included)
               perPdfResults.forEach((result: SearchMatch) => {
                 if (!pageSet.has(result.page_number)) {
                   pageSet.add(result.page_number);
@@ -751,8 +808,20 @@ function renderResults(matches: SearchMatch[]) {
                   pageGroups.get(match.page_number)!.push(match);
                 });
 
-                // Render each page with combined queries
-                const combinedQueries = [...mainQueries, perPdfQuery];
+                // Render each page with combined queries (current + per-PDF + original pinned if applicable)
+                let combinedQueries = [...mainQueries, perPdfQuery];
+                if (pinnedResults.has(filePath)) {
+                  const pinnedData = pinnedResults.get(filePath)!;
+                  // Add original queries, avoiding duplicates
+                  const queryMap = new Map<string, QueryItem>();
+                  combinedQueries.forEach(q => queryMap.set(q.query, q));
+                  pinnedData.queries.forEach(q => {
+                    if (!queryMap.has(q.query)) {
+                      queryMap.set(q.query, q);
+                    }
+                  });
+                  combinedQueries = Array.from(queryMap.values());
+                }
 
                 pageGroups.forEach((pageMatches, pageNumber) => {
                   const pageId = `page-${fileId}-${pageNumber}`;
@@ -805,59 +874,74 @@ function renderResults(matches: SearchMatch[]) {
                       })
                       .catch(() => {
                         pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
-                      })
-                      .finally(() => {
-                        loadedCount++;
-                        // Hide status when all pages are loaded
-                        if (loadedCount === totalPages && statusSpan) {
-                          statusSpan.classList.remove('visible');
-                        }
                       });
                   }
                 });
               } else if (matchesContainer) {
                 matchesContainer.innerHTML = '<div class="page-preview-loading">No matches found for this search term in the PDF.</div>';
-                // Hide status text
-                if (statusSpan) {
-                  statusSpan.classList.remove('visible');
-                }
               }
             } catch (error) {
               console.error('Per-PDF search failed:', error);
               if (matchesContainer) {
                 matchesContainer.innerHTML = `<div class="page-preview-error">Search failed: ${error}</div>`;
               }
-              // Hide status text on error
-              if (statusSpan) {
-                statusSpan.classList.remove('visible');
-              }
             }
           } else {
             // Clear the per-PDF query and restore original results
             perPdfSearchQueries.delete(filePath);
 
-            // Hide status text
-            if (statusSpan) {
-              statusSpan.classList.remove('visible');
-            }
-
-            // Re-render with just the original search results
+            // Re-render with combined original + current search results (without per-PDF)
             if (matchesContainer) {
               matchesContainer.innerHTML = '';
 
-              const existingResults = currentResults.filter(m => m.file_path === filePath);
-              existingResults.sort((a, b) => a.page_number - b.page_number);
+              // Combine current search results and pinned results (if applicable)
+              const pageSet = new Set<number>();
+              const combinedResults: SearchMatch[] = [];
 
-              if (existingResults.length > 0) {
+              // Add current search results
+              const currentSearchResults = currentResults.filter(m => m.file_path === filePath);
+              currentSearchResults.forEach(result => {
+                if (!pageSet.has(result.page_number)) {
+                  pageSet.add(result.page_number);
+                  combinedResults.push(result);
+                }
+              });
+
+              // Add pinned results (if this PDF is pinned)
+              if (pinnedResults.has(filePath)) {
+                const pinnedData = pinnedResults.get(filePath)!;
+                pinnedData.matches.forEach(result => {
+                  if (!pageSet.has(result.page_number)) {
+                    pageSet.add(result.page_number);
+                    combinedResults.push(result);
+                  }
+                });
+              }
+
+              combinedResults.sort((a, b) => a.page_number - b.page_number);
+
+              if (combinedResults.length > 0) {
                 const pageGroups = new Map<number, SearchMatch[]>();
-                existingResults.forEach(match => {
+                combinedResults.forEach(match => {
                   if (!pageGroups.has(match.page_number)) {
                     pageGroups.set(match.page_number, []);
                   }
                   pageGroups.get(match.page_number)!.push(match);
                 });
 
-                const mainQueries = getAllQueries();
+                // Combine queries from current search and pinned search (if applicable)
+                let combinedQueries = getAllQueries();
+                if (pinnedResults.has(filePath)) {
+                  const pinnedData = pinnedResults.get(filePath)!;
+                  const queryMap = new Map<string, QueryItem>();
+                  combinedQueries.forEach(q => queryMap.set(q.query, q));
+                  pinnedData.queries.forEach(q => {
+                    if (!queryMap.has(q.query)) {
+                      queryMap.set(q.query, q);
+                    }
+                  });
+                  combinedQueries = Array.from(queryMap.values());
+                }
 
                 pageGroups.forEach((pageMatches, pageNumber) => {
                   const pageId = `page-${fileId}-${pageNumber}`;
@@ -900,7 +984,7 @@ function renderResults(matches: SearchMatch[]) {
                   const match = pageId.match(/page-(.+)-(\d+)$/);
                   if (match) {
                     const pageNumber = parseInt(match[2]);
-                    loadPageImage(filePath, pageNumber, mainQueries)
+                    loadPageImage(filePath, pageNumber, combinedQueries)
                       .then(canvas => {
                         pageElement.innerHTML = '';
                         pageElement.appendChild(canvas);
@@ -1313,6 +1397,43 @@ async function performSearch(event: Event) {
 
     const results = await invoke<SearchMatch[]>('search_pdf_files', { params });
     currentResults = results;
+
+    // Re-search pinned PDFs with the new queries to get all pages matching the new search
+    const pinnedFilePaths = Array.from(pinnedResults.keys());
+    for (const filePath of pinnedFilePaths) {
+      try {
+        const pinnedParams: SearchParams = {
+          queries,
+          directory: filePath, // Search single PDF
+          context_words: 100,
+          zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+        };
+        const pinnedFileResults = await invoke<SearchMatch[]>('search_single_pdf_file', { params: pinnedParams });
+
+        // Keep the original queries but update matches with new search results
+        const existingPinned = pinnedResults.get(filePath);
+        if (existingPinned) {
+          if (pinnedFileResults.length > 0) {
+            // Update matches with new search, but keep original queries
+            pinnedResults.set(filePath, {
+              queries: existingPinned.queries, // Keep original queries
+              matches: pinnedFileResults,
+              timestamp: Date.now()
+            });
+          } else {
+            // No new matches found, keep everything as is
+            pinnedResults.set(filePath, {
+              queries: existingPinned.queries, // Keep original queries
+              matches: existingPinned.matches, // Keep original matches
+              timestamp: Date.now()
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to re-search pinned PDF ${filePath}:`, error);
+      }
+    }
+    savePinnedResults();
 
     renderResults(results);
     showStatus(`Found ${results.length} ${results.length === 1 ? 'match' : 'matches'}`, 'success');
