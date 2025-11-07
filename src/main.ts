@@ -31,6 +31,8 @@ interface SearchMatch {
 interface QueryItem {
   query: string;
   use_regex: boolean;
+  query_type: string; // "parallel" or "filter"
+  color: string; // hex color for highlighting
 }
 
 interface SearchParams {
@@ -52,6 +54,7 @@ const MAX_SEARCH_HISTORY = 10;
 let searchForm: HTMLFormElement;
 let searchQueriesContainer: HTMLElement;
 let addSearchTermBtn: HTMLAnchorElement;
+let addFilterTermBtn: HTMLAnchorElement;
 let directoryPath: HTMLInputElement;
 let browseBtn: HTMLButtonElement;
 let zoteroMode: HTMLInputElement;
@@ -112,19 +115,26 @@ function clearSearchHistory() {
   localStorage.removeItem('pdfSearchHistory');
 }
 
-function addSearchQueryItem() {
+function addSearchQueryItem(queryType: 'parallel' | 'filter' = 'parallel') {
   const container = searchQueriesContainer;
   const index = queryCount++;
 
+  // Default colors: yellow for parallel, green for filter
+  const defaultColor = queryType === 'parallel' ? '#ffff00' : '#22c55e';
+
   const queryItem = document.createElement('div');
-  queryItem.className = 'search-query-item';
+  queryItem.className = queryType === 'filter' ? 'search-query-item filter-type' : 'search-query-item';
   queryItem.dataset.index = String(index);
+  queryItem.dataset.queryType = queryType;
+  queryItem.dataset.color = defaultColor;
+
+  const placeholder = queryType === 'parallel' ? 'Enter search term...' : 'Enter filter term...';
 
   queryItem.innerHTML = `
     <input
       type="text"
       class="search-query-input"
-      placeholder="Enter search term..."
+      placeholder="${placeholder}"
       data-index="${index}"
     />
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -132,15 +142,37 @@ function addSearchQueryItem() {
         <input type="checkbox" class="use-regex-checkbox" data-index="${index}" />
         Use Regex
       </label>
+      <div class="color-picker-container">
+        <div class="color-picker" data-index="${index}" style="background-color: ${defaultColor};" title="Click to change highlight color"></div>
+        <input type="color" class="color-input" data-index="${index}" value="${defaultColor}" />
+      </div>
       <button type="button" class="remove-query-btn" data-index="${index}">×</button>
     </div>
   `;
 
   container.appendChild(queryItem);
 
-  // Add event listener to remove button
+  // Add event listener to remove button (only show for non-first items)
   const removeBtn = queryItem.querySelector('.remove-query-btn') as HTMLButtonElement;
-  removeBtn.addEventListener('click', () => removeSearchQueryItem(index));
+  if (index === 0) {
+    removeBtn.style.display = 'none';
+  } else {
+    removeBtn.addEventListener('click', () => removeSearchQueryItem(index));
+  }
+
+  // Add color picker event listener
+  const colorPicker = queryItem.querySelector('.color-picker') as HTMLElement;
+  const colorInput = queryItem.querySelector('.color-input') as HTMLInputElement;
+
+  colorPicker.addEventListener('click', () => {
+    colorInput.click();
+  });
+
+  colorInput.addEventListener('input', (e) => {
+    const color = (e.target as HTMLInputElement).value;
+    colorPicker.style.backgroundColor = color;
+    queryItem.dataset.color = color;
+  });
 }
 
 function removeSearchQueryItem(index: number) {
@@ -151,17 +183,23 @@ function removeSearchQueryItem(index: number) {
 }
 
 function getAllQueries(): QueryItem[] {
-  const inputs = searchQueriesContainer.querySelectorAll('.search-query-input') as NodeListOf<HTMLInputElement>;
+  const queryItems = searchQueriesContainer.querySelectorAll('.search-query-item') as NodeListOf<HTMLElement>;
   const queries: QueryItem[] = [];
 
-  inputs.forEach(input => {
+  queryItems.forEach(queryItem => {
+    const input = queryItem.querySelector('.search-query-input') as HTMLInputElement;
     const query = input.value.trim();
+
     if (query) {
-      const index = input.dataset.index!;
-      const regexCheckbox = searchQueriesContainer.querySelector(`.use-regex-checkbox[data-index="${index}"]`) as HTMLInputElement;
+      const regexCheckbox = queryItem.querySelector('.use-regex-checkbox') as HTMLInputElement;
+      const queryType = queryItem.dataset.queryType || 'parallel';
+      const color = queryItem.dataset.color || '#ffff00';
+
       queries.push({
         query,
-        use_regex: regexCheckbox.checked
+        use_regex: regexCheckbox.checked,
+        query_type: queryType,
+        color: color
       });
     }
   });
@@ -391,7 +429,6 @@ function renderResults(matches: SearchMatch[]) {
 
           // Load pages
           const queries = getAllQueries();
-          const query = queries.length > 0 ? queries[queries.length - 1].query : '';
           const pageElements = matchesContainer.querySelectorAll('.page-preview');
           pageElements.forEach((pageElement) => {
             const pageId = pageElement.id;
@@ -403,7 +440,7 @@ function renderResults(matches: SearchMatch[]) {
               // Find the actual file path from fileGroups
               for (const [filePath] of fileGroups.entries()) {
                 if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
-                  loadPageImage(filePath, pageNumber, query)
+                  loadPageImage(filePath, pageNumber, queries)
                     .then(canvas => {
                       if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
                         pageElement.innerHTML = '';
@@ -526,7 +563,7 @@ async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {
       coverContainer.appendChild(wrapper);
 
       try {
-        const canvas = await loadPageImage(filePath, 1, '');
+        const canvas = await loadPageImage(filePath, 1, []);
         wrapper.innerHTML = '';
         wrapper.appendChild(canvas);
       } catch {
@@ -591,15 +628,21 @@ function renderSearchDropdown() {
 
       item.queries.forEach((queryItem, index) => {
         const newIndex = queryCount++;
+        const queryType = queryItem.query_type || 'parallel';
+        const color = queryItem.color || (queryType === 'parallel' ? '#ffff00' : '#22c55e');
+        const placeholder = queryType === 'parallel' ? 'Enter search term...' : 'Enter filter term...';
+
         const queryItemEl = document.createElement('div');
-        queryItemEl.className = 'search-query-item';
+        queryItemEl.className = queryType === 'filter' ? 'search-query-item filter-type' : 'search-query-item';
         queryItemEl.dataset.index = String(newIndex);
+        queryItemEl.dataset.queryType = queryType;
+        queryItemEl.dataset.color = color;
 
         queryItemEl.innerHTML = `
           <input
             type="text"
             class="search-query-input"
-            placeholder="Enter search term..."
+            placeholder="${placeholder}"
             data-index="${newIndex}"
             value="${escapeHtml(queryItem.query)}"
           />
@@ -608,6 +651,10 @@ function renderSearchDropdown() {
               <input type="checkbox" class="use-regex-checkbox" data-index="${newIndex}" ${queryItem.use_regex ? 'checked' : ''} />
               Use Regex
             </label>
+            <div class="color-picker-container">
+              <div class="color-picker" data-index="${newIndex}" style="background-color: ${color};" title="Click to change highlight color"></div>
+              <input type="color" class="color-input" data-index="${newIndex}" value="${color}" />
+            </div>
             ${index > 0 ? `<button type="button" class="remove-query-btn" data-index="${newIndex}">×</button>` : ''}
           </div>
         `;
@@ -619,6 +666,20 @@ function renderSearchDropdown() {
           const removeBtn = queryItemEl.querySelector('.remove-query-btn') as HTMLButtonElement;
           removeBtn.addEventListener('click', () => removeSearchQueryItem(newIndex));
         }
+
+        // Add color picker event listeners
+        const colorPicker = queryItemEl.querySelector('.color-picker') as HTMLElement;
+        const colorInput = queryItemEl.querySelector('.color-input') as HTMLInputElement;
+
+        colorPicker.addEventListener('click', () => {
+          colorInput.click();
+        });
+
+        colorInput.addEventListener('input', (e) => {
+          const newColor = (e.target as HTMLInputElement).value;
+          colorPicker.style.backgroundColor = newColor;
+          queryItemEl.dataset.color = newColor;
+        });
       });
 
       hideSearchDropdown();
@@ -654,7 +715,7 @@ function hideSearchDropdown() {
   }
 }
 
-async function loadPageImage(filePath: string, pageNumber: number, searchQuery: string): Promise<HTMLCanvasElement> {
+async function loadPageImage(filePath: string, pageNumber: number, queries: QueryItem[]): Promise<HTMLCanvasElement> {
   try {
     // Read the PDF file from the backend (bypasses CORS issues)
     const pdfBytes = await invoke<number[]>('read_pdf_file', { filePath });
@@ -690,39 +751,49 @@ async function loadPageImage(filePath: string, pageNumber: number, searchQuery: 
     // Get text content for highlighting
     const textContent = await page.getTextContent();
 
-    // Highlight search terms (draw rectangles over matches)
-    // Skip highlighting if search query is empty (e.g., for cover pages)
-    if (searchQuery.trim().length > 0) {
-      context.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow highlight
-      const searchLower = searchQuery.toLowerCase();
+    // Highlight each search term with its respective color
+    if (queries.length > 0) {
+      for (const queryItem of queries) {
+        const searchQuery = queryItem.query;
+        if (searchQuery.trim().length > 0) {
+          // Convert hex color to rgba with transparency
+          const hexColor = queryItem.color;
+          const r = parseInt(hexColor.slice(1, 3), 16);
+          const g = parseInt(hexColor.slice(3, 5), 16);
+          const b = parseInt(hexColor.slice(5, 7), 16);
+          context.fillStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
 
-      for (const item of textContent.items) {
-        if ('str' in item && item.str.toLowerCase().includes(searchLower)) {
-          // Get the transform matrix [a, b, c, d, e, f]
-          const tx = item.transform;
+          const searchLower = searchQuery.toLowerCase();
 
-          // Calculate the bounding box in PDF coordinates
-          // The transform gives us position and scale
-          const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
-          const fontWidth = item.width;
+          for (const item of textContent.items) {
+            if ('str' in item && item.str.toLowerCase().includes(searchLower)) {
+              // Get the transform matrix [a, b, c, d, e, f]
+              const tx = item.transform;
 
-          // Convert PDF coordinates to viewport coordinates
-          const left = tx[4];
-          const bottom = tx[5];
-          const right = left + fontWidth;
-          const top = bottom + fontHeight;
+              // Calculate the bounding box in PDF coordinates
+              // The transform gives us position and scale
+              const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]); // Scale in Y direction
+              const fontWidth = item.width;
 
-          // Transform to viewport space
-          const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
-          const [x2, y2] = viewport.convertToViewportPoint(right, top);
+              // Convert PDF coordinates to viewport coordinates
+              const left = tx[4];
+              const bottom = tx[5];
+              const right = left + fontWidth;
+              const top = bottom + fontHeight;
 
-          // Draw the highlight rectangle
-          const rectX = Math.min(x1, x2);
-          const rectY = Math.min(y1, y2);
-          const rectWidth = Math.abs(x2 - x1);
-          const rectHeight = Math.abs(y2 - y1);
+              // Transform to viewport space
+              const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
+              const [x2, y2] = viewport.convertToViewportPoint(right, top);
 
-          context.fillRect(rectX, rectY, rectWidth, rectHeight);
+              // Draw the highlight rectangle
+              const rectX = Math.min(x1, x2);
+              const rectY = Math.min(y1, y2);
+              const rectWidth = Math.abs(x2 - x1);
+              const rectHeight = Math.abs(y2 - y1);
+
+              context.fillRect(rectX, rectY, rectWidth, rectHeight);
+            }
+          }
         }
       }
     }
@@ -857,6 +928,7 @@ window.addEventListener("DOMContentLoaded", () => {
   searchForm = document.querySelector("#search-form")!;
   searchQueriesContainer = document.querySelector("#search-queries-container")!;
   addSearchTermBtn = document.querySelector("#add-search-term")!;
+  addFilterTermBtn = document.querySelector("#add-filter-term")!;
   directoryPath = document.querySelector("#directory-path")!;
   browseBtn = document.querySelector("#browse-btn")!;
   zoteroMode = document.querySelector("#zotero-mode")!;
@@ -886,6 +958,23 @@ window.addEventListener("DOMContentLoaded", () => {
     toggleZoteroFolder();
   }
 
+  // Set up initial color picker
+  const initialColorPicker = document.querySelector('.color-picker[data-index="0"]') as HTMLElement;
+  const initialColorInput = document.querySelector('.color-input[data-index="0"]') as HTMLInputElement;
+  if (initialColorPicker && initialColorInput) {
+    initialColorPicker.addEventListener('click', () => {
+      initialColorInput.click();
+    });
+    initialColorInput.addEventListener('input', (e) => {
+      const color = (e.target as HTMLInputElement).value;
+      initialColorPicker.style.backgroundColor = color;
+      const queryItem = initialColorPicker.closest('.search-query-item') as HTMLElement;
+      if (queryItem) {
+        queryItem.dataset.color = color;
+      }
+    });
+  }
+
   // Add event listeners
   searchForm.addEventListener("submit", performSearch);
   browseBtn.addEventListener("click", browseDirectory);
@@ -895,7 +984,13 @@ window.addEventListener("DOMContentLoaded", () => {
   // Add search term button
   addSearchTermBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    addSearchQueryItem();
+    addSearchQueryItem('parallel');
+  });
+
+  // Add filter term button
+  addFilterTermBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    addSearchQueryItem('filter');
   });
 
   zoteroMode.addEventListener("change", () => {

@@ -30,10 +30,22 @@ pub struct SearchMatch {
     pub zotero_metadata: Option<ZoteroMetadata>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryItem {
     pub query: String,
     pub use_regex: bool,
+    #[serde(default = "default_query_type")]
+    pub query_type: String, // "parallel" or "filter"
+    #[serde(default = "default_color")]
+    pub color: String, // hex color for highlighting
+}
+
+fn default_query_type() -> String {
+    "parallel".to_string()
+}
+
+fn default_color() -> String {
+    "#ffff00".to_string() // yellow default
 }
 
 #[derive(Debug, Deserialize)]
@@ -375,9 +387,17 @@ fn search_pdf_with_queries(
         ))
         .unwrap_or((None, None));
 
-    // First, check if the PDF contains ALL queries (anywhere in the document)
-    // For each query, we need to find at least one page that contains it
-    for query_item in queries.iter() {
+    // Separate queries into parallel and filter types
+    let parallel_queries: Vec<&QueryItem> = queries.iter()
+        .filter(|q| q.query_type == "parallel")
+        .collect();
+    let filter_queries: Vec<&QueryItem> = queries.iter()
+        .filter(|q| q.query_type == "filter")
+        .collect();
+
+    // First, check if the PDF contains ALL filter queries (anywhere in the document)
+    // Filter queries act as document-level filters
+    for query_item in &filter_queries {
         let mut found_in_pdf = false;
 
         for (_page_num, page_text) in &pages {
@@ -390,30 +410,38 @@ fn search_pdf_with_queries(
         }
 
         if !found_in_pdf {
-            // This PDF doesn't contain this query anywhere, so skip the entire PDF
+            // This PDF doesn't contain this filter query anywhere, so skip the entire PDF
             return Ok(Vec::new());
         }
     }
 
-    // If we get here, the PDF contains all queries (on any pages)
-    // Now return the matches from the LAST query only
-    let last_query = &queries[queries.len() - 1];
+    // If we get here, the PDF passes all filters
+    // Now collect matches from ALL parallel queries
     let mut final_results = Vec::new();
 
-    for (page_num, page_text) in pages {
-        let matches = search_in_page(&page_text, &last_query.query, context_words, last_query.use_regex)?;
+    // If there are no parallel queries, use the first query as parallel
+    let queries_to_search: Vec<&QueryItem> = if parallel_queries.is_empty() && !queries.is_empty() {
+        vec![&queries[0]]
+    } else {
+        parallel_queries
+    };
 
-        for (context_before, matched_text, context_after) in matches {
-            final_results.push(SearchMatch {
-                file_path: pdf_path.to_string_lossy().to_string(),
-                file_name: file_name.clone(),
-                page_number: page_num,
-                context_before,
-                matched_text,
-                context_after,
-                zotero_link: zotero_link.clone(),
-                zotero_metadata: zotero_metadata.clone(),
-            });
+    for query_item in queries_to_search {
+        for (page_num, page_text) in &pages {
+            let matches = search_in_page(page_text, &query_item.query, context_words, query_item.use_regex)?;
+
+            for (context_before, matched_text, context_after) in matches {
+                final_results.push(SearchMatch {
+                    file_path: pdf_path.to_string_lossy().to_string(),
+                    file_name: file_name.clone(),
+                    page_number: *page_num,
+                    context_before,
+                    matched_text,
+                    context_after,
+                    zotero_link: zotero_link.clone(),
+                    zotero_metadata: zotero_metadata.clone(),
+                });
+            }
         }
     }
 
