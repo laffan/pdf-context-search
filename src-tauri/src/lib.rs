@@ -1,11 +1,16 @@
 mod pdf_search;
 
-use pdf_search::{export_to_markdown, search_pdfs, SearchMatch, SearchParams};
+use pdf_search::{export_to_markdown, search_pdfs, search_single_pdf, SearchMatch, SearchParams};
 use std::fs;
 
 #[tauri::command]
 fn search_pdf_files(params: SearchParams) -> Result<Vec<SearchMatch>, String> {
     search_pdfs(params).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn search_single_pdf_file(params: SearchParams) -> Result<Vec<SearchMatch>, String> {
+    search_single_pdf(params).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -26,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             search_pdf_files,
+            search_single_pdf_file,
             export_results_to_markdown,
             read_pdf_file
         ])

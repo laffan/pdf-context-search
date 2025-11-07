@@ -495,6 +495,41 @@ pub fn search_pdfs(params: SearchParams) -> Result<Vec<SearchMatch>> {
     Ok(all_matches)
 }
 
+pub fn search_single_pdf(params: SearchParams) -> Result<Vec<SearchMatch>> {
+    // In this case, params.directory is actually the file path
+    let pdf_path = PathBuf::from(&params.directory);
+
+    if params.queries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    if !pdf_path.exists() || !pdf_path.is_file() {
+        return Err(anyhow::anyhow!("File does not exist or is not a file: {:?}", pdf_path));
+    }
+
+    // Build Zotero map if path is provided
+    let zotero_map = if let Some(ref zotero_path) = params.zotero_path {
+        let path = PathBuf::from(zotero_path);
+        match build_zotero_map(&path) {
+            Ok(map) => Some(map),
+            Err(e) => {
+                eprintln!("Warning: Failed to load Zotero database: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Search the single PDF
+    search_pdf_with_queries(
+        &pdf_path,
+        &params.queries,
+        params.context_words,
+        zotero_map.as_ref(),
+    )
+}
+
 pub fn export_to_markdown(matches: &[SearchMatch]) -> String {
     let mut markdown = String::from("# PDF Search Results\n\n");
     markdown.push_str(&format!("Total matches found: {}\n\n", matches.len()));

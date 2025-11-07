@@ -448,9 +448,25 @@ function renderResults(matches: SearchMatch[]) {
           arrow.classList.add('open');
           if (searchInputContainer) {
             searchInputContainer.classList.add('visible');
+
+            // Restore per-PDF query text if it exists
+            const searchInput = searchInputContainer.querySelector('.pdf-search-input') as HTMLInputElement;
+            const filePath = searchInput?.dataset.filepath;
+            if (searchInput && filePath) {
+              const storedQuery = perPdfSearchQueries.get(filePath);
+              if (storedQuery) {
+                searchInput.value = storedQuery;
+
+                // Automatically trigger the per-PDF search to show merged results
+                // Simulate Enter key press
+                const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+                searchInput.dispatchEvent(enterEvent);
+                return; // Let the per-PDF search handler take over
+              }
+            }
           }
 
-          // Load pages
+          // Load pages normally (if no per-PDF query)
           const queries = getAllQueries();
           const pageElements = matchesContainer.querySelectorAll('.page-preview');
           pageElements.forEach((pageElement) => {
@@ -463,19 +479,7 @@ function renderResults(matches: SearchMatch[]) {
               // Find the actual file path from fileGroups
               for (const [filePath] of fileGroups.entries()) {
                 if (filePath.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey) {
-                  // Combine main queries with per-PDF query if it exists
-                  const combinedQueries = [...queries];
-                  const perPdfQuery = perPdfSearchQueries.get(filePath);
-                  if (perPdfQuery) {
-                    combinedQueries.push({
-                      query: perPdfQuery,
-                      use_regex: false,
-                      query_type: 'parallel',
-                      color: '#0080ff' // Bright blue for per-PDF searches
-                    });
-                  }
-
-                  loadPageImage(filePath, pageNumber, combinedQueries)
+                  loadPageImage(filePath, pageNumber, queries)
                     .then(canvas => {
                       if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
                         pageElement.innerHTML = '';
@@ -504,7 +508,7 @@ function renderResults(matches: SearchMatch[]) {
 
   // Set up event listeners for per-PDF search inputs
   document.querySelectorAll('.pdf-search-input').forEach(input => {
-    input.addEventListener('keydown', (e) => {
+    input.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         const inputElement = e.target as HTMLInputElement;
@@ -513,43 +517,121 @@ function renderResults(matches: SearchMatch[]) {
         const searchQuery = inputElement.value.trim();
 
         if (filePath && fileId) {
-          // Store or clear the per-PDF query
-          if (searchQuery) {
-            perPdfSearchQueries.set(filePath, searchQuery);
-          } else {
-            perPdfSearchQueries.delete(filePath);
-          }
-
-          // Re-render the pages with combined queries
           const matchesContainer = document.getElementById(`matches-${fileId}`);
-          if (matchesContainer && matchesContainer.classList.contains('open')) {
-            const queries = getAllQueries();
-            const pageElements = matchesContainer.querySelectorAll('.page-preview');
 
-            pageElements.forEach((pageElement) => {
-              const pageId = pageElement.id;
-              const match = pageId.match(/page-(.+)-(\d+)$/);
-              if (match) {
-                const filePathKey = match[1];
-                const pageNumber = parseInt(match[2]);
+          if (searchQuery) {
+            // Store the per-PDF query
+            perPdfSearchQueries.set(filePath, searchQuery);
 
-                // Find the actual file path from fileGroups
-                for (const [fp] of fileGroups.entries()) {
-                  if (fp.replace(/[^a-zA-Z0-9]/g, '_') === filePathKey && fp === filePath) {
-                    // Combine main queries with per-PDF query
-                    const combinedQueries = [...queries];
-                    if (searchQuery) {
-                      combinedQueries.push({
-                        query: searchQuery,
-                        use_regex: false,
-                        query_type: 'parallel',
-                        color: '#0080ff' // Bright blue for per-PDF searches
-                      });
+            // Show loading state
+            if (matchesContainer) {
+              matchesContainer.innerHTML = '<div class="page-preview-loading">Searching entire PDF...</div>';
+            }
+
+            try {
+              // Search the entire PDF with the per-PDF query
+              const mainQueries = getAllQueries();
+              const perPdfQuery: QueryItem = {
+                query: searchQuery,
+                use_regex: false,
+                query_type: 'parallel',
+                color: '#0080ff' // Bright blue for per-PDF searches
+              };
+
+              const params: SearchParams = {
+                queries: [perPdfQuery],
+                directory: filePath, // For single PDF search, this is the file path
+                context_words: 100,
+                zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+              };
+
+              const perPdfResults = await invoke<SearchMatch[]>('search_single_pdf_file', { params });
+
+              // Merge with existing results for this file from currentResults
+              // Get existing results for this file from the original search
+              const existingResults = currentResults.filter(m => m.file_path === filePath);
+
+              // Combine results and remove duplicates by page number
+              const pageSet = new Set<number>();
+              const mergedResults: SearchMatch[] = [];
+
+              // Add existing results
+              existingResults.forEach(result => {
+                if (!pageSet.has(result.page_number)) {
+                  pageSet.add(result.page_number);
+                  mergedResults.push(result);
+                }
+              });
+
+              // Add per-PDF results (for pages not already included)
+              perPdfResults.forEach(result => {
+                if (!pageSet.has(result.page_number)) {
+                  pageSet.add(result.page_number);
+                  mergedResults.push(result);
+                }
+              });
+
+              // Sort by page number
+              mergedResults.sort((a, b) => a.page_number - b.page_number);
+
+              // Re-render this PDF's matches with the merged results
+              if (matchesContainer && mergedResults.length > 0) {
+                matchesContainer.innerHTML = '';
+
+                // Group by page
+                const pageGroups = new Map<number, SearchMatch[]>();
+                mergedResults.forEach(match => {
+                  if (!pageGroups.has(match.page_number)) {
+                    pageGroups.set(match.page_number, []);
+                  }
+                  pageGroups.get(match.page_number)!.push(match);
+                });
+
+                // Render each page with combined queries
+                const combinedQueries = [...mainQueries, perPdfQuery];
+
+                pageGroups.forEach((pageMatches, pageNumber) => {
+                  const pageId = `page-${fileId}-${pageNumber}`;
+                  const firstMatch = pageMatches[0];
+                  const zoteroMetadata = firstMatch.zotero_metadata;
+
+                  const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+                    ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+                    : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
+
+                  const matchDiv = document.createElement('div');
+                  matchDiv.className = 'result-match';
+                  matchDiv.innerHTML = `
+                    <div class="result-match-header">${pageHeader}</div>
+                    <div class="page-preview" id="${pageId}">
+                      <div class="page-preview-loading">Loading page preview...</div>
+                    </div>
+                  `;
+
+                  matchesContainer.appendChild(matchDiv);
+                });
+
+                // Re-setup page link event listeners
+                matchesContainer.querySelectorAll('.page-link').forEach(link => {
+                  link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const attachmentKey = (link as HTMLAnchorElement).dataset.attachmentKey;
+                    const page = (link as HTMLAnchorElement).dataset.page;
+                    if (attachmentKey && page) {
+                      openInZotero(attachmentKey, parseInt(page), link as HTMLAnchorElement);
                     }
+                  });
+                });
 
-                    // Clear and re-render the page
-                    pageElement.innerHTML = '<div class="page-preview-loading">Updating preview...</div>';
-                    loadPageImage(fp, pageNumber, combinedQueries)
+                // Load all page images with combined queries
+                const pageElements = matchesContainer.querySelectorAll('.page-preview');
+                pageElements.forEach((pageElement) => {
+                  const pageId = pageElement.id;
+                  const match = pageId.match(/page-(.+)-(\d+)$/);
+                  if (match) {
+                    const pageNumber = parseInt(match[2]);
+                    loadPageImage(filePath, pageNumber, combinedQueries)
                       .then(canvas => {
                         pageElement.innerHTML = '';
                         pageElement.appendChild(canvas);
@@ -557,11 +639,92 @@ function renderResults(matches: SearchMatch[]) {
                       .catch(() => {
                         pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
                       });
-                    break;
                   }
-                }
+                });
+              } else if (matchesContainer) {
+                matchesContainer.innerHTML = '<div class="page-preview-loading">No matches found for this search term in the PDF.</div>';
               }
-            });
+            } catch (error) {
+              console.error('Per-PDF search failed:', error);
+              if (matchesContainer) {
+                matchesContainer.innerHTML = `<div class="page-preview-error">Search failed: ${error}</div>`;
+              }
+            }
+          } else {
+            // Clear the per-PDF query and restore original results
+            perPdfSearchQueries.delete(filePath);
+
+            // Re-render with just the original search results
+            if (matchesContainer) {
+              matchesContainer.innerHTML = '';
+
+              const existingResults = currentResults.filter(m => m.file_path === filePath);
+              existingResults.sort((a, b) => a.page_number - b.page_number);
+
+              if (existingResults.length > 0) {
+                const pageGroups = new Map<number, SearchMatch[]>();
+                existingResults.forEach(match => {
+                  if (!pageGroups.has(match.page_number)) {
+                    pageGroups.set(match.page_number, []);
+                  }
+                  pageGroups.get(match.page_number)!.push(match);
+                });
+
+                const mainQueries = getAllQueries();
+
+                pageGroups.forEach((pageMatches, pageNumber) => {
+                  const pageId = `page-${fileId}-${pageNumber}`;
+                  const firstMatch = pageMatches[0];
+                  const zoteroMetadata = firstMatch.zotero_metadata;
+
+                  const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+                    ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+                    : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
+
+                  const matchDiv = document.createElement('div');
+                  matchDiv.className = 'result-match';
+                  matchDiv.innerHTML = `
+                    <div class="result-match-header">${pageHeader}</div>
+                    <div class="page-preview" id="${pageId}">
+                      <div class="page-preview-loading">Loading page preview...</div>
+                    </div>
+                  `;
+
+                  matchesContainer.appendChild(matchDiv);
+                });
+
+                // Re-setup page link event listeners
+                matchesContainer.querySelectorAll('.page-link').forEach(link => {
+                  link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const attachmentKey = (link as HTMLAnchorElement).dataset.attachmentKey;
+                    const page = (link as HTMLAnchorElement).dataset.page;
+                    if (attachmentKey && page) {
+                      openInZotero(attachmentKey, parseInt(page), link as HTMLAnchorElement);
+                    }
+                  });
+                });
+
+                // Load pages
+                const pageElements = matchesContainer.querySelectorAll('.page-preview');
+                pageElements.forEach((pageElement) => {
+                  const pageId = pageElement.id;
+                  const match = pageId.match(/page-(.+)-(\d+)$/);
+                  if (match) {
+                    const pageNumber = parseInt(match[2]);
+                    loadPageImage(filePath, pageNumber, mainQueries)
+                      .then(canvas => {
+                        pageElement.innerHTML = '';
+                        pageElement.appendChild(canvas);
+                      })
+                      .catch(() => {
+                        pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                      });
+                  }
+                });
+              }
+            }
           }
         }
       }
