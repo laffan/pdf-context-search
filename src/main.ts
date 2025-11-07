@@ -320,12 +320,12 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
 
   // Create original search term display
   const originalSearchDisplay = isPinned && originalQueries
-    ? `<span class="original-search-term">Original: ${originalQueries.map(q => q.query).join(', ')}</span>`
+    ? `<span class="original-search-term">${originalQueries.map(q => q.query).join(', ')}</span>`
     : '';
 
   // Determine pin button state
   const pinButtonClass = isPinned ? 'pin-btn pinned' : 'pin-btn';
-  const pinButtonIcon = isPinned ? '📌' : '📍';
+  const pinButtonIcon = '📍';
   const pinButtonTitle = isPinned ? 'Unpin this result' : 'Pin this result';
 
   // Add pinned header class if needed
@@ -335,6 +335,7 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
     <div class="result-file ${isPinned ? 'pinned' : ''}">
       <div class="${headerClass}">
         <div class="result-file-header-content">
+          <button class="${pinButtonClass}" data-filepath="${escapeHtml(filePath)}" title="${pinButtonTitle}">${pinButtonIcon}</button>
           ${zoteroMetadata ? `
             <div class="zotero-header-title">
               <h3>${escapeHtml(zoteroMetadata.title || fileName)}</h3>
@@ -345,9 +346,8 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
                 ${zoteroMetadata.authors ? `${zoteroMetadata.year ? ' - ' : ''}${escapeHtml(zoteroMetadata.authors)}` : ''}
               </div>
             ` : ''}
+            ${originalSearchDisplay}
             <div class="result-file-header-buttons">
-              ${originalSearchDisplay}
-              <button class="${pinButtonClass}" data-filepath="${escapeHtml(filePath)}" title="${pinButtonTitle}">${pinButtonIcon}</button>
               <button class="btn-icon result-matches-toggle" data-fileid="${fileId}" data-pinned="${isPinned}">
                 <span>✓ Matches (${fileMatches.length})</span>
                 <span class="result-matches-toggle-arrow">►</span>
@@ -363,9 +363,8 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
           ` : `
             <div class="result-file-header-title">
               <h3>${fileName}</h3>
+              ${originalSearchDisplay}
               <div class="result-file-header-buttons">
-                ${originalSearchDisplay}
-                <button class="${pinButtonClass}" data-filepath="${escapeHtml(filePath)}" title="${pinButtonTitle}">${pinButtonIcon}</button>
                 <button class="btn-icon result-matches-toggle" data-fileid="${fileId}" data-pinned="${isPinned}">
                   <span>✓ Matches (${fileMatches.length})</span>
                   <span class="result-matches-toggle-arrow">►</span>

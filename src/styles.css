@@ -542,12 +542,13 @@ body {
   margin-right: -24px;
   padding-left: 40px;
   padding-right: 40px;
+  position: relative;
 }
 
 .result-file-header-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 3px;
 }
 
 .result-file-header-title {
@@ -657,38 +658,58 @@ body {
 
 /* Pin Button Styles */
 .pin-btn {
-  padding: 6px 12px;
+  position: absolute;
+  top: 16px;
+  right: 40px;
+  padding: 0;
   background-color: transparent;
   color: var(--text-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 16px;
+  border: none;
+  border-radius: 0;
+  font-size: 20px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity 0.2s, filter 0.2s;
   white-space: nowrap;
-  opacity: 0.7;
+  opacity: 0.6;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: grayscale(100%);
 }
 
 .pin-btn:hover {
   opacity: 1;
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+  filter: grayscale(0%);
 }
 
 .pin-btn.pinned {
-  background-color: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
+  background-color: transparent;
+  color: var(--primary-color);
+  border-color: transparent;
   opacity: 1;
+  filter: saturate(150%);
 }
 
 .pin-btn.pinned:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background-color: transparent;
+  border-color: transparent;
+  opacity: 0.8;
+  filter: saturate(150%);
 }
 
 /* Original Search Term Display */
+.pin-badge-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .original-search-term {
+  position: absolute;
+  top: 16px;
+  right: 70px;
   font-size: 11px;
   color: var(--text-secondary);
   font-style: italic;
