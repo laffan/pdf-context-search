@@ -422,7 +422,7 @@ body {
 .results-topbar {
   height: 30px;
   max-height: 30px;
-  background-color: var(--border-color);
+  background-color: var(--background);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -452,7 +452,6 @@ body {
 
 .column-icon:hover {
   opacity: 0.8;
-  background-color: var(--surface);
 }
 
 .column-icon.active {
@@ -755,7 +754,6 @@ body {
 
 .result-matches {
   background-color: var(--surface);
-  border-bottom: 1px solid var(--border-color);
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-out;
