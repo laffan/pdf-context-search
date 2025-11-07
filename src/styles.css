@@ -510,25 +510,6 @@ body {
   width: 100%;
 }
 
-/* Column Layout Styles */
-.results-container.columns-1 {
-  display: block;
-}
-
-.results-container.columns-2 {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.results-container.columns-3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
 .empty-state {
   display: flex;
   align-items: center;
@@ -787,9 +768,39 @@ body {
   max-height: 10000px;
 }
 
+/* Column Layout Styles for Matches */
+.result-matches.columns-1 {
+  display: block;
+}
+
+.result-matches.columns-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.result-matches.columns-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
 .result-match {
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
+}
+
+/* Remove borders and padding when in grid mode */
+.result-matches.columns-2 .result-match,
+.result-matches.columns-3 .result-match {
+  padding: 0;
+  border-bottom: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px;
+  background-color: var(--surface);
 }
 
 .result-match:last-child {

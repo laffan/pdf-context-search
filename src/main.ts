@@ -367,6 +367,12 @@ function renderResults(matches: SearchMatch[]) {
 
   resultsContainer.innerHTML = html;
 
+  // Apply saved column layout to all result-matches
+  const savedColumnLayout = localStorage.getItem('pdfSearchColumnLayout') || '1';
+  document.querySelectorAll('.result-matches').forEach(matches => {
+    matches.classList.add(`columns-${savedColumnLayout}`);
+  });
+
   // Set up event listeners for show cover buttons
   document.querySelectorAll('.show-cover-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -968,7 +974,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Restore column layout preference
   const savedColumnLayout = localStorage.getItem('pdfSearchColumnLayout') || '1';
-  resultsContainer.classList.add(`columns-${savedColumnLayout}`);
   // Set active state on the corresponding icon
   document.querySelectorAll('.column-icon').forEach(icon => {
     if ((icon as HTMLElement).dataset.columns === savedColumnLayout) {
@@ -976,6 +981,11 @@ window.addEventListener("DOMContentLoaded", () => {
     } else {
       icon.classList.remove('active');
     }
+  });
+  // Apply saved layout to any existing result-matches
+  document.querySelectorAll('.result-matches').forEach(matches => {
+    matches.classList.remove('columns-1', 'columns-2', 'columns-3');
+    matches.classList.add(`columns-${savedColumnLayout}`);
   });
 
   // Set up initial color picker
@@ -1017,9 +1027,11 @@ window.addEventListener("DOMContentLoaded", () => {
       // Get the number of columns
       const columns = (icon as HTMLElement).dataset.columns || '1';
 
-      // Update results container with column layout class
-      resultsContainer.classList.remove('columns-1', 'columns-2', 'columns-3');
-      resultsContainer.classList.add(`columns-${columns}`);
+      // Update all result-matches with column layout class
+      document.querySelectorAll('.result-matches').forEach(matches => {
+        matches.classList.remove('columns-1', 'columns-2', 'columns-3');
+        matches.classList.add(`columns-${columns}`);
+      });
 
       // Save preference to localStorage
       localStorage.setItem('pdfSearchColumnLayout', columns);
