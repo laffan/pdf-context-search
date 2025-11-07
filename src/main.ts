@@ -131,21 +131,23 @@ function addSearchQueryItem(queryType: 'parallel' | 'filter' = 'parallel') {
   const placeholder = queryType === 'parallel' ? 'Enter search term...' : 'Enter filter term...';
 
   queryItem.innerHTML = `
-    <input
-      type="text"
-      class="search-query-input"
-      placeholder="${placeholder}"
-      data-index="${index}"
-    />
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <input
+        type="text"
+        class="search-query-input"
+        placeholder="${placeholder}"
+        data-index="${index}"
+      />
+      <div class="color-picker-container">
+        <div class="color-picker" data-index="${index}" style="background-color: ${defaultColor};" title="Click to change highlight color"></div>
+        <input type="color" class="color-input" data-index="${index}" value="${defaultColor}" />
+      </div>
+    </div>
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <label class="inline-checkbox">
         <input type="checkbox" class="use-regex-checkbox" data-index="${index}" />
         Use Regex
       </label>
-      <div class="color-picker-container">
-        <div class="color-picker" data-index="${index}" style="background-color: ${defaultColor};" title="Click to change highlight color"></div>
-        <input type="color" class="color-input" data-index="${index}" value="${defaultColor}" />
-      </div>
       <button type="button" class="remove-query-btn" data-index="${index}">×</button>
     </div>
   `;
@@ -639,22 +641,24 @@ function renderSearchDropdown() {
         queryItemEl.dataset.color = color;
 
         queryItemEl.innerHTML = `
-          <input
-            type="text"
-            class="search-query-input"
-            placeholder="${placeholder}"
-            data-index="${newIndex}"
-            value="${escapeHtml(queryItem.query)}"
-          />
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input
+              type="text"
+              class="search-query-input"
+              placeholder="${placeholder}"
+              data-index="${newIndex}"
+              value="${escapeHtml(queryItem.query)}"
+            />
+            <div class="color-picker-container">
+              <div class="color-picker" data-index="${newIndex}" style="background-color: ${color};" title="Click to change highlight color"></div>
+              <input type="color" class="color-input" data-index="${newIndex}" value="${color}" />
+            </div>
+          </div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <label class="inline-checkbox">
               <input type="checkbox" class="use-regex-checkbox" data-index="${newIndex}" ${queryItem.use_regex ? 'checked' : ''} />
               Use Regex
             </label>
-            <div class="color-picker-container">
-              <div class="color-picker" data-index="${newIndex}" style="background-color: ${color};" title="Click to change highlight color"></div>
-              <input type="color" class="color-input" data-index="${newIndex}" value="${color}" />
-            </div>
             ${index > 0 ? `<button type="button" class="remove-query-btn" data-index="${newIndex}">×</button>` : ''}
           </div>
         `;

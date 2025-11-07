@@ -153,11 +153,8 @@ body {
 }
 
 .search-query-item .color-picker-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  position: relative;
+  flex-shrink: 0;
 }
 
 .search-query-item .color-picker {
@@ -180,6 +177,7 @@ body {
 }
 
 .search-query-item .search-query-input {
+  flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;

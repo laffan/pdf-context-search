@@ -17,22 +17,24 @@
             <label for="search-query">Search Query</label>
             <div id="search-queries-container">
               <div class="search-query-item" data-index="0" data-query-type="parallel" data-color="#ffff00">
-                <input
-                  type="text"
-                  class="search-query-input"
-                  placeholder="Enter search term..."
-                  required
-                  data-index="0"
-                />
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input
+                    type="text"
+                    class="search-query-input"
+                    placeholder="Enter search term..."
+                    required
+                    data-index="0"
+                  />
+                  <div class="color-picker-container">
+                    <div class="color-picker" data-index="0" style="background-color: #ffff00;" title="Click to change highlight color"></div>
+                    <input type="color" class="color-input" data-index="0" value="#ffff00" />
+                  </div>
+                </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <label class="inline-checkbox">
                     <input type="checkbox" class="use-regex-checkbox" data-index="0" />
                     Use Regex
                   </label>
-                  <div class="color-picker-container">
-                    <div class="color-picker" data-index="0" style="background-color: #ffff00;" title="Click to change highlight color"></div>
-                    <input type="color" class="color-input" data-index="0" value="#ffff00" />
-                  </div>
                 </div>
               </div>
             </div>
