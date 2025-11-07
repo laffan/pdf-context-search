@@ -510,6 +510,25 @@ body {
   width: 100%;
 }
 
+/* Column Layout Styles */
+.results-container.columns-1 {
+  display: block;
+}
+
+.results-container.columns-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.results-container.columns-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .empty-state {
   display: flex;
   align-items: center;

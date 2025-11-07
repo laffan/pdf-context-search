@@ -966,6 +966,18 @@ window.addEventListener("DOMContentLoaded", () => {
     toggleZoteroFolder();
   }
 
+  // Restore column layout preference
+  const savedColumnLayout = localStorage.getItem('pdfSearchColumnLayout') || '1';
+  resultsContainer.classList.add(`columns-${savedColumnLayout}`);
+  // Set active state on the corresponding icon
+  document.querySelectorAll('.column-icon').forEach(icon => {
+    if ((icon as HTMLElement).dataset.columns === savedColumnLayout) {
+      icon.classList.add('active');
+    } else {
+      icon.classList.remove('active');
+    }
+  });
+
   // Set up initial color picker
   const initialColorPicker = document.querySelector('.color-picker[data-index="0"]') as HTMLElement;
   const initialColorInput = document.querySelector('.color-input[data-index="0"]') as HTMLInputElement;
@@ -1003,9 +1015,14 @@ window.addEventListener("DOMContentLoaded", () => {
       icon.classList.add('active');
 
       // Get the number of columns
-      const columns = (icon as HTMLElement).dataset.columns;
-      console.log(`Column layout changed to: ${columns} column(s)`);
-      // TODO: Implement actual column layout functionality
+      const columns = (icon as HTMLElement).dataset.columns || '1';
+
+      // Update results container with column layout class
+      resultsContainer.classList.remove('columns-1', 'columns-2', 'columns-3');
+      resultsContainer.classList.add(`columns-${columns}`);
+
+      // Save preference to localStorage
+      localStorage.setItem('pdfSearchColumnLayout', columns);
     });
   });
 
