@@ -457,7 +457,6 @@ body {
 
 .column-icon.active {
   opacity: 1;
-  background-color: var(--surface);
 }
 
 .column-icon .icon-bar {
@@ -776,13 +775,17 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-  padding: 16px;
 }
 
 .result-matches.columns-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+}
+
+/* Add padding only when accordion is open */
+.result-matches.open.columns-2,
+.result-matches.open.columns-3 {
   padding: 16px;
 }
 
@@ -791,14 +794,12 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
-/* Remove borders and padding when in grid mode */
+/* Remove borders when in grid mode */
 .result-matches.columns-2 .result-match,
 .result-matches.columns-3 .result-match {
-  padding: 0;
   border-bottom: none;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 12px;
   background-color: var(--surface);
 }
 
