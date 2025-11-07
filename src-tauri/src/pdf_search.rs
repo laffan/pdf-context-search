@@ -317,7 +317,6 @@ fn search_in_page(
     use_regex: bool,
 ) -> Result<Vec<(String, String, String)>> {
     let mut matches = Vec::new();
-    let words = split_into_words(page_text);
 
     // Normalize both query and page text to handle PDFs with inconsistent spacing
     let normalized_query = normalize_text(query);
