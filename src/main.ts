@@ -504,8 +504,9 @@ function renderResults(matches: SearchMatch[]) {
 
   // Set up event listeners for per-PDF search inputs
   document.querySelectorAll('.pdf-search-input').forEach(input => {
-    input.addEventListener('keydown', async (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
+    input.addEventListener('keydown', async (e: Event) => {
+      const keyEvent = e as KeyboardEvent;
+      if (keyEvent.key === 'Enter') {
         e.preventDefault();
         const inputElement = e.target as HTMLInputElement;
         const filePath = inputElement.dataset.filepath;
