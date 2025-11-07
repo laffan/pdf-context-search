@@ -30,6 +30,7 @@ html, body {
 body {
   background-color: var(--background);
   color: var(--text-primary);
+  border-top: 1px solid var(--border-color);
 }
 
 .app-container {
@@ -427,7 +428,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 12px;
   flex-shrink: 0;
 }
 
