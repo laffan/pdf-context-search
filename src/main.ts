@@ -320,6 +320,7 @@ function renderResults(matches: SearchMatch[]) {
                 <button class="btn-icon open-zotero-btn" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key || '')}" data-page="${fileMatches[0].page_number}">📖 Zotero</button>
                 <div class="pdf-search-input-container" data-fileid="${fileId}">
                   <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                  <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
                 </div>
               </div>
             ` : `
@@ -333,6 +334,7 @@ function renderResults(matches: SearchMatch[]) {
                   <button class="btn-icon show-cover-btn" data-filepath="${escapeHtml(filePath)}">📖 Cover</button>
                   <div class="pdf-search-input-container" data-fileid="${fileId}">
                     <input type="text" class="pdf-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+                    <span class="pdf-search-status" data-fileid="${fileId}">Searching...</span>
                   </div>
                 </div>
               </div>
@@ -448,25 +450,9 @@ function renderResults(matches: SearchMatch[]) {
           arrow.classList.add('open');
           if (searchInputContainer) {
             searchInputContainer.classList.add('visible');
-
-            // Restore per-PDF query text if it exists
-            const searchInput = searchInputContainer.querySelector('.pdf-search-input') as HTMLInputElement;
-            const filePath = searchInput?.dataset.filepath;
-            if (searchInput && filePath) {
-              const storedQuery = perPdfSearchQueries.get(filePath);
-              if (storedQuery) {
-                searchInput.value = storedQuery;
-
-                // Automatically trigger the per-PDF search to show merged results
-                // Simulate Enter key press
-                const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
-                searchInput.dispatchEvent(enterEvent);
-                return; // Let the per-PDF search handler take over
-              }
-            }
           }
 
-          // Load pages normally (if no per-PDF query)
+          // Load pages normally
           const queries = getAllQueries();
           const pageElements = matchesContainer.querySelectorAll('.page-preview');
           pageElements.forEach((pageElement) => {
@@ -495,11 +481,21 @@ function renderResults(matches: SearchMatch[]) {
             }
           });
         } else {
-          // Closing
+          // Closing - clear per-PDF search
           matchesContainer.classList.remove('open');
           arrow.classList.remove('open');
           if (searchInputContainer) {
             searchInputContainer.classList.remove('visible');
+
+            // Clear the per-PDF search input and stored query
+            const searchInput = searchInputContainer.querySelector('.pdf-search-input') as HTMLInputElement;
+            if (searchInput) {
+              const filePath = searchInput.dataset.filepath;
+              if (filePath) {
+                perPdfSearchQueries.delete(filePath);
+              }
+              searchInput.value = '';
+            }
           }
         }
       }
@@ -518,10 +514,16 @@ function renderResults(matches: SearchMatch[]) {
 
         if (filePath && fileId) {
           const matchesContainer = document.getElementById(`matches-${fileId}`);
+          const statusSpan = document.querySelector(`.pdf-search-status[data-fileid="${fileId}"]`) as HTMLElement;
 
           if (searchQuery) {
             // Store the per-PDF query
             perPdfSearchQueries.set(filePath, searchQuery);
+
+            // Show status text
+            if (statusSpan) {
+              statusSpan.classList.add('visible');
+            }
 
             // Show loading state
             if (matchesContainer) {
@@ -626,6 +628,9 @@ function renderResults(matches: SearchMatch[]) {
 
                 // Load all page images with combined queries
                 const pageElements = matchesContainer.querySelectorAll('.page-preview');
+                let loadedCount = 0;
+                const totalPages = pageElements.length;
+
                 pageElements.forEach((pageElement) => {
                   const pageId = pageElement.id;
                   const match = pageId.match(/page-(.+)-(\d+)$/);
@@ -638,21 +643,41 @@ function renderResults(matches: SearchMatch[]) {
                       })
                       .catch(() => {
                         pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                      })
+                      .finally(() => {
+                        loadedCount++;
+                        // Hide status when all pages are loaded
+                        if (loadedCount === totalPages && statusSpan) {
+                          statusSpan.classList.remove('visible');
+                        }
                       });
                   }
                 });
               } else if (matchesContainer) {
                 matchesContainer.innerHTML = '<div class="page-preview-loading">No matches found for this search term in the PDF.</div>';
+                // Hide status text
+                if (statusSpan) {
+                  statusSpan.classList.remove('visible');
+                }
               }
             } catch (error) {
               console.error('Per-PDF search failed:', error);
               if (matchesContainer) {
                 matchesContainer.innerHTML = `<div class="page-preview-error">Search failed: ${error}</div>`;
               }
+              // Hide status text on error
+              if (statusSpan) {
+                statusSpan.classList.remove('visible');
+              }
             }
           } else {
             // Clear the per-PDF query and restore original results
             perPdfSearchQueries.delete(filePath);
+
+            // Hide status text
+            if (statusSpan) {
+              statusSpan.classList.remove('visible');
+            }
 
             // Re-render with just the original search results
             if (matchesContainer) {
