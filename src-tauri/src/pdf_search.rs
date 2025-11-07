@@ -293,6 +293,23 @@ fn split_into_words(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Normalize text for searching by removing whitespace and common separators
+/// This handles cases where PDFs don't have proper word spacing
+fn normalize_text(text: &str) -> String {
+    text.chars()
+        .filter_map(|c| {
+            match c {
+                // Remove all whitespace
+                ' ' | '\t' | '\n' | '\r' | '\u{00A0}' | '\u{2007}' | '\u{202F}' => None,
+                // Remove hyphens and soft hyphens
+                '-' | '\u{00AD}' | '\u{2010}' | '\u{2011}' => None,
+                // Keep everything else
+                _ => Some(c),
+            }
+        })
+        .collect()
+}
+
 fn search_in_page(
     page_text: &str,
     query: &str,
@@ -302,23 +319,21 @@ fn search_in_page(
     let mut matches = Vec::new();
     let words = split_into_words(page_text);
 
-    // Remove spaces from query to handle multi-word searches in PDFs without spaces
-    let query_no_spaces = query.replace(" ", "");
+    // Normalize both query and page text to handle PDFs with inconsistent spacing
+    let normalized_query = normalize_text(query);
+    let normalized_page = normalize_text(page_text);
 
     if use_regex {
         // Case-insensitive regex by default
-        let pattern = Regex::new(&format!("(?i){}", query_no_spaces))?;
+        let pattern = Regex::new(&format!("(?i){}", normalized_query))?;
 
-        // Create a version of page_text without spaces for matching
-        let page_text_no_spaces = page_text.replace(" ", "");
-
-        for regex_match in pattern.find_iter(&page_text_no_spaces) {
+        for regex_match in pattern.find_iter(&normalized_page) {
             let match_start = regex_match.start();
             let match_end = regex_match.end();
             let matched_text = regex_match.as_str().to_string();
 
-            let before_text = &page_text_no_spaces[..match_start];
-            let after_text = &page_text_no_spaces[match_end..];
+            let before_text = &normalized_page[..match_start];
+            let after_text = &normalized_page[match_end..];
 
             let before_words: Vec<String> = split_into_words(before_text);
             let after_words: Vec<String> = split_into_words(after_text);
@@ -343,21 +358,47 @@ fn search_in_page(
         }
     } else {
         // Case-insensitive search by default
-        let search_query = query_no_spaces.to_lowercase();
+        let search_query = normalized_query.to_lowercase();
 
-        for (i, word) in words.iter().enumerate() {
-            let compare_word = word.to_lowercase();
+        // Search the full normalized text instead of word-by-word
+        // This catches multi-word queries that span across "words" in the original text
+        let normalized_page_lower = normalized_page.to_lowercase();
 
-            if compare_word.contains(&search_query) {
-                let start = i.saturating_sub(context_words);
-                let end = (i + context_words + 1).min(words.len());
+        let mut search_start = 0;
+        while let Some(match_pos) = normalized_page_lower[search_start..].find(&search_query) {
+            let absolute_pos = search_start + match_pos;
+            let match_end = absolute_pos + search_query.len();
 
-                let context_before = words[start..i].join(" ");
-                let matched_text = word.clone();
-                let context_after = words[(i + 1)..end].join(" ");
+            // Extract matched text from normalized page
+            let matched_text = normalized_page[absolute_pos..match_end].to_string();
 
-                matches.push((context_before, matched_text, context_after));
-            }
+            // Get context from normalized text
+            let before_text = &normalized_page[..absolute_pos];
+            let after_text = &normalized_page[match_end..];
+
+            let before_words: Vec<String> = split_into_words(before_text);
+            let after_words: Vec<String> = split_into_words(after_text);
+
+            let context_before = before_words
+                .iter()
+                .rev()
+                .take(context_words)
+                .rev()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let context_after = after_words
+                .iter()
+                .take(context_words)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            matches.push((context_before, matched_text, context_after));
+
+            // Move past this match to find the next one
+            search_start = match_end;
         }
     }
 
