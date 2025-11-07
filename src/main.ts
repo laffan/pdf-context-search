@@ -269,44 +269,6 @@ function getAllQueries(): QueryItem[] {
   return queries;
 }
 
-function getActiveQueryFilters(fileId: string): { original: QueryItem[], current: QueryItem[] } {
-  const original: QueryItem[] = [];
-  const current: QueryItem[] = [];
-
-  const matchesContainer = document.getElementById(`matches-${fileId}`);
-  if (!matchesContainer) return { original, current };
-
-  // Get checked original queries
-  const originalCheckboxes = matchesContainer.querySelectorAll('input[data-query-type="original"]:checked') as NodeListOf<HTMLInputElement>;
-  originalCheckboxes.forEach(checkbox => {
-    const query = checkbox.dataset.query;
-    if (query) {
-      original.push({
-        query: query,
-        use_regex: false,
-        query_type: 'parallel',
-        color: '#ffff00'
-      });
-    }
-  });
-
-  // Get checked current queries
-  const currentCheckboxes = matchesContainer.querySelectorAll('input[data-query-type="current"]:checked') as NodeListOf<HTMLInputElement>;
-  currentCheckboxes.forEach(checkbox => {
-    const query = checkbox.dataset.query;
-    if (query) {
-      current.push({
-        query: query,
-        use_regex: false,
-        query_type: 'parallel',
-        color: '#22c55e'
-      });
-    }
-  });
-
-  return { original, current };
-}
-
 async function browseDirectory() {
   try {
     const selected = await open({
@@ -353,7 +315,7 @@ function toggleZoteroFolder() {
   }
 }
 
-function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned: boolean, originalQueries?: QueryItem[], currentMatchCount?: number, originalMatchCount?: number): string {
+function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned: boolean, originalQueries?: QueryItem[], currentMatchCount?: number, originalMatchCount?: number, originalMatches?: SearchMatch[], currentMatches?: SearchMatch[]): string {
   // Safety check: don't render if no matches
   if (!fileMatches || fileMatches.length === 0) {
     return '';
@@ -438,22 +400,38 @@ function renderFileGroup(filePath: string, fileMatches: SearchMatch[], isPinned:
       <div class="result-matches-filter" id="filter-${fileId}" data-filepath="${escapeHtml(filePath)}">
         <input type="text" class="result-matches-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
         <div class="result-matches-query-filters">
-          ${isPinned && originalQueries ? originalQueries.map((q, i) => `
+          ${isPinned && originalQueries ? originalQueries.map((q, i) => {
+            // For pinned results, count from the original matches array (not the combined one)
+            const matchesToCount = originalMatches || fileMatches;
+            const queryMatchCount = matchesToCount.filter(match => {
+              const fullText = (match.context_before + match.matched_text + match.context_after).toLowerCase();
+              return fullText.includes(q.query.toLowerCase());
+            }).length;
+            return `
             <div class="result-matches-query-filter">
               <input type="checkbox" id="query-filter-original-${fileId}-${i}" data-query-type="original" data-query="${escapeHtml(q.query)}" checked />
-              <label for="query-filter-original-${fileId}-${i}">${escapeHtml(q.query)} - ${originalMatchCount || 0}</label>
+              <label for="query-filter-original-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
             </div>
-          `).join('') : ''}
+          `;
+          }).join('') : ''}
           ${(() => {
             const currentQueries = getAllQueries();
             const originalQueryStrs = originalQueries ? originalQueries.map(q => q.query) : [];
             // Only show current queries if they're different from original
-            return currentQueries.filter(q => !originalQueryStrs.includes(q.query)).map((q, i) => `
+            return currentQueries.filter(q => !originalQueryStrs.includes(q.query)).map((q, i) => {
+              // For pinned results, count from the current matches array (not the combined one)
+              const matchesToCount = currentMatches || fileMatches;
+              const queryMatchCount = matchesToCount.filter(match => {
+                const fullText = (match.context_before + match.matched_text + match.context_after).toLowerCase();
+                return fullText.includes(q.query.toLowerCase());
+              }).length;
+              return `
               <div class="result-matches-query-filter">
                 <input type="checkbox" id="query-filter-current-${fileId}-${i}" data-query-type="current" data-query="${escapeHtml(q.query)}" checked />
-                <label for="query-filter-current-${fileId}-${i}">${escapeHtml(q.query)} - ${currentMatchCount || 0}</label>
+                <label for="query-filter-current-${fileId}-${i}">${escapeHtml(q.query)} - ${queryMatchCount}</label>
               </div>
-            `).join('');
+            `;
+            }).join('');
           })()}
         </div>
       </div>
@@ -538,8 +516,8 @@ function renderResults(matches: SearchMatch[]) {
 
     const combinedMatches = Array.from(pageMap.values()).sort((a, b) => a.page_number - b.page_number);
 
-    // Pass combined matches for display, but separate counts for the button
-    html += renderFileGroup(filePath, combinedMatches, true, pinnedData.queries, currentMatchCount, originalMatchCount);
+    // Pass combined matches for display, but separate counts and arrays for filters
+    html += renderFileGroup(filePath, combinedMatches, true, pinnedData.queries, currentMatchCount, originalMatchCount, pinnedData.matches, currentMatches);
   });
 
   // Render current results (excluding already pinned files)
@@ -638,7 +616,8 @@ function renderResults(matches: SearchMatch[]) {
             const header = toggle.closest('.result-file-header');
             if (header) {
               const headerHeight = header.getBoundingClientRect().height;
-              filterBar.style.setProperty('top', `${headerHeight}px`);
+              // Subtract 2px to account for border-bottom that moves from header to filter bar
+              filterBar.style.setProperty('top', `${headerHeight - 2}px`);
             }
             filterBar.classList.add('visible');
           }
@@ -926,8 +905,6 @@ function renderResults(matches: SearchMatch[]) {
 
                 // Load all page images with combined queries
                 const pageElements = matchesContainer.querySelectorAll('.page-preview');
-                let loadedCount = 0;
-                const totalPages = pageElements.length;
 
                 pageElements.forEach((pageElement) => {
                   const pageId = pageElement.id;
@@ -965,7 +942,8 @@ function renderResults(matches: SearchMatch[]) {
       const header = (filterBar as HTMLElement).previousElementSibling as HTMLElement;
       if (header && header.classList.contains('result-file-header')) {
         const headerHeight = header.getBoundingClientRect().height;
-        (filterBar as HTMLElement).style.setProperty('top', `${headerHeight}px`);
+        // Subtract 2px to account for border-bottom that moves from header to filter bar
+        (filterBar as HTMLElement).style.setProperty('top', `${headerHeight - 2}px`);
       }
     });
   });
