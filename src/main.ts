@@ -1597,8 +1597,6 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
     const container = document.createElement('div');
     container.style.position = 'relative';
     container.style.display = 'block';
-    container.style.width = `${canvas.width}px`;
-    container.style.height = `${canvas.height}px`;
     container.style.cursor = 'crosshair';
     container.appendChild(canvas);
 
@@ -1655,12 +1653,17 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
       const endX = e.clientX - rect.left;
       const endY = e.clientY - rect.top;
 
-      // Calculate selection box
+      // Calculate the scale factor between displayed size and canvas intrinsic size
+      // In multi-column layouts, CSS scales the canvas down, so we need to scale coordinates up
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      // Calculate selection box in canvas coordinates (not display coordinates)
       const selectionBox = {
-        x: Math.min(startX, endX),
-        y: Math.min(startY, endY),
-        width: Math.abs(endX - startX),
-        height: Math.abs(endY - startY)
+        x: Math.min(startX, endX) * scaleX,
+        y: Math.min(startY, endY) * scaleY,
+        width: Math.abs(endX - startX) * scaleX,
+        height: Math.abs(endY - startY) * scaleY
       };
 
       // Remove selection overlay
