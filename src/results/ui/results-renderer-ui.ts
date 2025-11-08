@@ -214,8 +214,8 @@ export function renderResults(matches: SearchMatch[]) {
   // Convert to array and sort by match count, then by title/filename
   const pinnedArray = Array.from(pinnedResults.entries());
   pinnedArray.sort((a, b) => {
-    const [filePathA, pinnedDataA] = a;
-    const [filePathB, pinnedDataB] = b;
+    const [, pinnedDataA] = a;
+    const [, pinnedDataB] = b;
 
     // Get match counts
     const countA = pinnedDataA.matches.length;
@@ -253,8 +253,8 @@ export function renderResults(matches: SearchMatch[]) {
   // Convert to array and sort by match count, then by title/filename
   const fileGroupsArray = Array.from(fileGroups.entries()).filter(([filePath]) => !pinnedResults.has(filePath));
   fileGroupsArray.sort((a, b) => {
-    const [filePathA, matchesA] = a;
-    const [filePathB, matchesB] = b;
+    const [, matchesA] = a;
+    const [, matchesB] = b;
 
     // First sort by match count (descending)
     if (matchesA.length !== matchesB.length) {
