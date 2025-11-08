@@ -798,9 +798,9 @@ function renderResults(matches: SearchMatch[]) {
             // Show loading state
             matchesContainer.innerHTML = '<div class="page-preview-loading">Searching...</div>';
 
-            // Get all current queries to determine the next color
-            const allCurrentQueries = getAllQueries();
-            const nextColorIndex = allCurrentQueries.length;
+            // Count existing query filters in this PDF's filter bar to determine the next color
+            const existingFilterCheckboxes = filterBar.querySelectorAll('.result-matches-query-filter input[type="checkbox"]');
+            const nextColorIndex = existingFilterCheckboxes.length;
             const customQueryColor = getColorForQuery(nextColorIndex, 'parallel');
 
             // Search for this specific query to get match count
