@@ -256,8 +256,8 @@ function createNote(text: string, filePath: string, fileName: string, pageNumber
   };
 
   // Add Zotero metadata if available
-  if (zoteroMetadata) {
-    note.title = zoteroMetadata.title || fileName;
+  if (zoteroMetadata && zoteroMetadata.title && zoteroMetadata.title.trim()) {
+    note.title = zoteroMetadata.title.trim();
     note.authors = zoteroMetadata.authors || undefined;
     note.year = zoteroMetadata.year ? parseInt(zoteroMetadata.year) : undefined;
     note.citeKey = zoteroMetadata.citekey;

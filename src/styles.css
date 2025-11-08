@@ -1164,8 +1164,16 @@ body {
   }
 
   .note-item:hover {
-    background-color: #334155;
+    background-color: #475569;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .note-text:hover {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+
+  .note-text:focus {
+    background-color: rgba(59, 130, 246, 0.25);
   }
 }
 
