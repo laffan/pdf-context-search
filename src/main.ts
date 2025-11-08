@@ -1596,7 +1596,9 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
     // Create a container for the canvas with text selection capability
     const container = document.createElement('div');
     container.style.position = 'relative';
-    container.style.display = 'inline-block';
+    container.style.display = 'block';
+    container.style.width = `${canvas.width}px`;
+    container.style.height = `${canvas.height}px`;
     container.style.cursor = 'crosshair';
     container.appendChild(canvas);
 
@@ -1610,7 +1612,7 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
       if (e.button !== 0) return; // Only left click
 
       isSelecting = true;
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       startX = e.clientX - rect.left;
       startY = e.clientY - rect.top;
 
@@ -1629,7 +1631,7 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
     container.addEventListener('mousemove', (e) => {
       if (!isSelecting || !selectionOverlay) return;
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       const currentX = e.clientX - rect.left;
       const currentY = e.clientY - rect.top;
 
@@ -1649,7 +1651,7 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
 
       isSelecting = false;
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       const endX = e.clientX - rect.left;
       const endY = e.clientY - rect.top;
 
