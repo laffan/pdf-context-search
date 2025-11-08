@@ -355,9 +355,11 @@ function groupNotesBySource(): NoteGroup[] {
 
   notes.forEach(note => {
     if (!groups.has(note.filePath)) {
+      // Always prefer title over fileName for display
+      const displayTitle = note.title || note.fileName;
       groups.set(note.filePath, {
         filePath: note.filePath,
-        title: note.title || note.fileName,
+        title: displayTitle,
         authors: note.authors,
         year: note.year,
         citeKey: note.citeKey,
@@ -1002,7 +1004,10 @@ function renderResults(matches: SearchMatch[]) {
               }
 
               if (foundFilePath) {
-                loadPageImage(foundFilePath, pageNumber, queriesToUse, undefined)
+                // Find a match from this file to pass metadata
+                const fileMatch = currentResults.find(m => m.file_path === foundFilePath && m.page_number === pageNumber) ||
+                                  Array.from(pinnedResults.values()).flatMap(p => p.matches).find(m => m.file_path === foundFilePath && m.page_number === pageNumber);
+                loadPageImage(foundFilePath, pageNumber, queriesToUse, fileMatch)
                   .then(element => {
                     if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
                       pageElement.innerHTML = '';
@@ -1210,7 +1215,9 @@ function renderResults(matches: SearchMatch[]) {
                   const match = pageId.match(/page-(.+)-(\d+)$/);
                   if (match) {
                     const pageNumber = parseInt(match[2]);
-                    loadPageImage(filePath, pageNumber, combinedQueries, undefined)
+                    // Find a match from this file to pass metadata
+                    const fileMatch = mergedResults.find(m => m.page_number === pageNumber);
+                    loadPageImage(filePath, pageNumber, combinedQueries, fileMatch)
                       .then(element => {
                         pageElement.innerHTML = '';
                         pageElement.appendChild(element);
@@ -1283,7 +1290,10 @@ function renderResults(matches: SearchMatch[]) {
             const match = pageId.match(/page-(.+)-(\d+)$/);
             if (match) {
               const pageNumber = parseInt(match[2]);
-              loadPageImage(filePath, pageNumber, checkedQueries, undefined)
+              // Find a match from this file to pass metadata
+              const fileMatch = currentResults.find(m => m.file_path === filePath && m.page_number === pageNumber) ||
+                                Array.from(pinnedResults.values()).flatMap(p => p.matches).find(m => m.file_path === filePath && m.page_number === pageNumber);
+              loadPageImage(filePath, pageNumber, checkedQueries, fileMatch)
                 .then(element => {
                   pageElement.innerHTML = '';
                   pageElement.appendChild(element);

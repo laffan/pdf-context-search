@@ -1169,11 +1169,11 @@ body {
   }
 
   .note-text:hover {
-    background-color: rgba(59, 130, 246, 0.15);
+    background-color: rgba(59, 130, 246, 0.08);
   }
 
   .note-text:focus {
-    background-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.15);
   }
 }
 
