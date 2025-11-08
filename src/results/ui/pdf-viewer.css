@@ -1,0 +1,40 @@
+/* ========== Page Preview and PDF Viewer ========== */
+
+.page-preview {
+  margin-top: 16px;
+  background-color: var(--background);
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+}
+
+.page-preview canvas,
+.page-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.page-preview-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.page-preview-error {
+  color: #991b1b;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Selection rectangle overlay for PDF text selection */
+.selection-overlay {
+  position: absolute;
+  border: 2px dashed var(--primary-color);
+  background-color: rgba(37, 99, 235, 0.1);
+  pointer-events: none;
+  z-index: 10;
+}

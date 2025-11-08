@@ -1,0 +1,17 @@
+/* ========== Search Sidebar Styles ========== */
+
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--surface);
+  border-right: 1px solid var(--border-color);
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h1 {
+  font-size: 24px;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+}

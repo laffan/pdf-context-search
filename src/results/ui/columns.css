@@ -1,0 +1,32 @@
+/* ========== Column Layout Styles for Matches ========== */
+
+.result-matches.columns-1 {
+  display: block;
+}
+
+.result-matches.columns-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.result-matches.columns-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Add padding only when accordion is open */
+.result-matches.open.columns-2,
+.result-matches.open.columns-3 {
+  padding: 16px;
+}
+
+/* Remove borders when in grid mode */
+.result-matches.columns-2 .result-match,
+.result-matches.columns-3 .result-match {
+  border-bottom: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--surface);
+}

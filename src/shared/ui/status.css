@@ -1,0 +1,27 @@
+/* ========== Status Message Styles ========== */
+
+#status-message {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  display: none;
+}
+
+#status-message.info {
+  display: block;
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+#status-message.error {
+  display: block;
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+#status-message.success {
+  display: block;
+  background-color: #dcfce7;
+  color: #166534;
+}
