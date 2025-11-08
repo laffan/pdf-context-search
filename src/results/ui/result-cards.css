@@ -38,6 +38,9 @@
   color: var(--text-primary);
   margin-bottom: 0;
   flex: 1;
+  padding-right: 50px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .zotero-header-title {

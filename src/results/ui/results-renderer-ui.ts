@@ -211,7 +211,28 @@ export function renderResults(matches: SearchMatch[]) {
   let html = '';
 
   // Render pinned results first - combine original pinned matches with current matches
-  pinnedResults.forEach((pinnedData, filePath) => {
+  // Convert to array and sort by match count, then by title/filename
+  const pinnedArray = Array.from(pinnedResults.entries());
+  pinnedArray.sort((a, b) => {
+    const [filePathA, pinnedDataA] = a;
+    const [filePathB, pinnedDataB] = b;
+
+    // Get match counts
+    const countA = pinnedDataA.matches.length;
+    const countB = pinnedDataB.matches.length;
+
+    // First sort by match count (descending)
+    if (countA !== countB) {
+      return countB - countA;
+    }
+
+    // Then sort by title (Zotero) or filename
+    const titleA = pinnedDataA.matches[0]?.zotero_metadata?.title || pinnedDataA.matches[0]?.file_name || '';
+    const titleB = pinnedDataB.matches[0]?.zotero_metadata?.title || pinnedDataB.matches[0]?.file_name || '';
+    return titleA.toLowerCase().localeCompare(titleB.toLowerCase());
+  });
+
+  pinnedArray.forEach(([filePath, pinnedData]) => {
     // Get current matches for this file
     const currentMatchesForFile = fileGroups.get(filePath) || [];
     const currentMatchCount = currentMatchesForFile.length;
@@ -229,10 +250,25 @@ export function renderResults(matches: SearchMatch[]) {
   });
 
   // Render current results (excluding already pinned files)
-  fileGroups.forEach((fileMatches, filePath) => {
-    if (!pinnedResults.has(filePath)) {
-      html += renderFileGroup(filePath, fileMatches, false);
+  // Convert to array and sort by match count, then by title/filename
+  const fileGroupsArray = Array.from(fileGroups.entries()).filter(([filePath]) => !pinnedResults.has(filePath));
+  fileGroupsArray.sort((a, b) => {
+    const [filePathA, matchesA] = a;
+    const [filePathB, matchesB] = b;
+
+    // First sort by match count (descending)
+    if (matchesA.length !== matchesB.length) {
+      return matchesB.length - matchesA.length;
     }
+
+    // Then sort by title (Zotero) or filename
+    const titleA = matchesA[0]?.zotero_metadata?.title || matchesA[0]?.file_name || '';
+    const titleB = matchesB[0]?.zotero_metadata?.title || matchesB[0]?.file_name || '';
+    return titleA.toLowerCase().localeCompare(titleB.toLowerCase());
+  });
+
+  fileGroupsArray.forEach(([filePath, fileMatches]) => {
+    html += renderFileGroup(filePath, fileMatches, false);
   });
 
   resultsContainer.innerHTML = html;
