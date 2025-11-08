@@ -68,20 +68,28 @@ interface Note {
   filePath: string;
   fileName: string;
   pageNumber: number;
-  timestamp: string;
-  zoteroMetadata?: {
-    title: string;
-    authors: string;
-    year?: number;
-    citeKey?: string;
-    zoteroLink?: string;
-  };
+  title?: string;  // Zotero title or file name
+  authors?: string;
+  year?: number;
+  citeKey?: string;
+  zoteroLink?: string;
   selectionBox?: {
     x: number;
     y: number;
     width: number;
     height: number;
   };
+}
+
+// Group notes by source for display
+interface NoteGroup {
+  filePath: string;
+  title: string;
+  authors?: string;
+  year?: number;
+  citeKey?: string;
+  zoteroLink?: string;
+  notes: Note[];
 }
 
 const notes: Note[] = [];
@@ -208,11 +216,11 @@ function togglePinResult(filePath: string) {
 // ===== Notes Functions =====
 
 function toggleNotesSidebar() {
-  const isCollapsed = notesSidebar.classList.toggle('collapsed');
-  toggleNotesBtn.classList.toggle('active');
+  notesSidebar.classList.toggle('collapsed');
+  const isOpen = !notesSidebar.classList.contains('collapsed');
 
   // Save state to localStorage
-  localStorage.setItem('notesSidebarOpen', String(!isCollapsed));
+  localStorage.setItem('notesSidebarOpen', String(isOpen));
 }
 
 function loadNotes() {
@@ -244,22 +252,21 @@ function createNote(text: string, filePath: string, fileName: string, pageNumber
     filePath,
     fileName,
     pageNumber,
-    timestamp: new Date().toISOString(),
     selectionBox
   };
 
   // Add Zotero metadata if available
   if (zoteroMetadata) {
-    note.zoteroMetadata = {
-      title: zoteroMetadata.title || fileName,
-      authors: zoteroMetadata.authors || '',
-      year: zoteroMetadata.year ? parseInt(zoteroMetadata.year) : undefined,
-      citeKey: zoteroMetadata.citekey,
-      zoteroLink: zoteroMetadata.zotero_link
-    };
+    note.title = zoteroMetadata.title || fileName;
+    note.authors = zoteroMetadata.authors || undefined;
+    note.year = zoteroMetadata.year ? parseInt(zoteroMetadata.year) : undefined;
+    note.citeKey = zoteroMetadata.citekey;
+    note.zoteroLink = zoteroMetadata.zotero_link;
+  } else {
+    note.title = fileName;
   }
 
-  notes.unshift(note); // Add to beginning (newest first)
+  notes.push(note);
   saveNotes();
   renderNotesList();
 
@@ -304,26 +311,32 @@ function exportNotesToMarkdown() {
 
   let markdown = '# Notes from PDF Search\n\n';
 
-  notes.forEach((note, index) => {
-    const title = note.zoteroMetadata?.title || note.fileName;
-    const authors = note.zoteroMetadata?.authors;
-    const year = note.zoteroMetadata?.year;
+  const groups = groupNotesBySource();
 
-    markdown += `## ${title}`;
-    if (authors || year) {
+  groups.forEach((group, groupIndex) => {
+    markdown += `## ${group.title}`;
+    if (group.authors || group.year) {
       markdown += ' (';
-      if (authors) markdown += authors;
-      if (authors && year) markdown += ', ';
-      if (year) markdown += year;
+      if (group.authors) markdown += group.authors;
+      if (group.authors && group.year) markdown += ', ';
+      if (group.year) markdown += group.year;
       markdown += ')';
     }
     markdown += '\n\n';
 
-    markdown += `**Page ${note.pageNumber}**\n\n`;
-    markdown += `> "${note.text}"\n\n`;
-    markdown += `*Added: ${formatTimestamp(note.timestamp)}*\n\n`;
+    group.notes.forEach((note) => {
+      // Use markdown link if Zotero link is available
+      if (note.zoteroLink) {
+        const zoteroPageLink = `${note.zoteroLink}?page=${note.pageNumber}`;
+        markdown += `**[Page ${note.pageNumber}](${zoteroPageLink})**\n\n`;
+      } else {
+        markdown += `**Page ${note.pageNumber}**\n\n`;
+      }
 
-    if (index < notes.length - 1) {
+      markdown += `> "${note.text}"\n\n`;
+    });
+
+    if (groupIndex < groups.length - 1) {
       markdown += '---\n\n';
     }
   });
@@ -337,6 +350,33 @@ function exportNotesToMarkdown() {
   });
 }
 
+function groupNotesBySource(): NoteGroup[] {
+  const groups = new Map<string, NoteGroup>();
+
+  notes.forEach(note => {
+    if (!groups.has(note.filePath)) {
+      groups.set(note.filePath, {
+        filePath: note.filePath,
+        title: note.title || note.fileName,
+        authors: note.authors,
+        year: note.year,
+        citeKey: note.citeKey,
+        zoteroLink: note.zoteroLink,
+        notes: []
+      });
+    }
+    groups.get(note.filePath)!.notes.push(note);
+  });
+
+  // Convert to array and sort notes within each group by page number
+  const groupArray = Array.from(groups.values());
+  groupArray.forEach(group => {
+    group.notes.sort((a, b) => a.pageNumber - b.pageNumber);
+  });
+
+  return groupArray;
+}
+
 function renderNotesList() {
   if (notes.length === 0) {
     notesList.innerHTML = `
@@ -348,35 +388,70 @@ function renderNotesList() {
     return;
   }
 
-  notesList.innerHTML = notes.map(note => {
-    const title = note.zoteroMetadata?.title || note.fileName;
-    const authors = note.zoteroMetadata?.authors;
-    const year = note.zoteroMetadata?.year;
+  const groups = groupNotesBySource();
 
-    let metaStr = '';
-    if (authors) metaStr += `<em>${authors}</em>`;
-    if (authors && year) metaStr += ', ';
-    if (year) metaStr += year;
-    if (metaStr) metaStr += ' • ';
-    metaStr += `p. ${note.pageNumber}`;
+  notesList.innerHTML = groups.map(group => {
+    let groupHtml = `
+      <div class="note-group">
+        <div class="note-group-header">
+          <strong>${escapeHtml(group.title)}</strong>`;
 
-    return `
-      <div class="note-item" data-note-id="${note.id}">
-        <div class="note-header">
-          <span class="note-source"><strong>${escapeHtml(title)}</strong></span>
-          <span class="note-meta">${metaStr}</span>
+    if (group.authors || group.year) {
+      groupHtml += '<br><span class="note-group-meta">';
+      if (group.authors) groupHtml += `<em>${escapeHtml(group.authors)}</em>`;
+      if (group.authors && group.year) groupHtml += ', ';
+      if (group.year) groupHtml += group.year;
+      groupHtml += '</span>';
+    }
+
+    groupHtml += `
         </div>
-        <div class="note-text">"${escapeHtml(note.text)}"</div>
-        <div class="note-footer">
-          <span class="note-timestamp">${formatTimestamp(note.timestamp)}</span>
+        <div class="note-group-items">`;
+
+    group.notes.forEach(note => {
+      groupHtml += `
+        <div class="note-item" data-note-id="${note.id}">
+          <div class="note-page">Page ${note.pageNumber}</div>
+          <div class="note-text" contenteditable="true" data-note-id="${note.id}">${escapeHtml(note.text)}</div>
           <div class="note-actions">
             <button class="note-action-btn copy-note-btn" title="Copy" data-note-id="${note.id}">📋</button>
             <button class="note-action-btn delete-note-btn" title="Delete" data-note-id="${note.id}">🗑️</button>
           </div>
+        </div>`;
+    });
+
+    groupHtml += `
         </div>
-      </div>
-    `;
+      </div>`;
+
+    return groupHtml;
   }).join('');
+
+  // Add event listeners for editable text
+  notesList.querySelectorAll('.note-text[contenteditable]').forEach(el => {
+    el.addEventListener('blur', (e) => {
+      const id = (e.currentTarget as HTMLElement).dataset.noteId!;
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        const newText = (e.currentTarget as HTMLElement).textContent || '';
+        if (newText.trim().length >= 3) {
+          note.text = newText.trim();
+          saveNotes();
+        } else {
+          // Restore original text if too short
+          (e.currentTarget as HTMLElement).textContent = note.text;
+        }
+      }
+    });
+
+    // Prevent newlines in contenteditable
+    el.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') {
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).blur();
+      }
+    });
+  });
 
   // Add event listeners to note action buttons
   notesList.querySelectorAll('.copy-note-btn').forEach(btn => {
@@ -395,22 +470,6 @@ function renderNotesList() {
       }
     });
   });
-}
-
-function formatTimestamp(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-
-  return date.toLocaleDateString();
 }
 
 // ===== End Notes Functions =====
@@ -1971,7 +2030,10 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Notes sidebar event listeners
-  toggleNotesBtn.addEventListener("click", toggleNotesSidebar);
+  toggleNotesBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleNotesSidebar();
+  });
   exportNotesBtn.addEventListener("click", exportNotesToMarkdown);
   clearNotesBtn.addEventListener("click", clearAllNotes);
 
@@ -1979,7 +2041,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const notesSidebarOpen = localStorage.getItem('notesSidebarOpen');
   if (notesSidebarOpen === 'true') {
     notesSidebar.classList.remove('collapsed');
-    toggleNotesBtn.classList.add('active');
   }
 
   // Column layout icons event handlers
