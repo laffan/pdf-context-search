@@ -100,7 +100,10 @@
               <span class="icon-bar"></span>
             </span>
           </div>
-          <a href="#" id="export-link" class="export-link disabled">Copy Results</a>
+          <div class="topbar-actions">
+            <a href="#" id="export-link" class="export-link disabled">Copy Results</a>
+            <button id="toggle-notes-btn" class="toggle-notes-btn" title="Toggle Notes Sidebar">📝 Notes</button>
+          </div>
         </div>
 
         <div class="results-header">
@@ -114,6 +117,23 @@
           </div>
         </div>
       </main>
+
+      <!-- Notes Sidebar -->
+      <aside class="notes-sidebar collapsed">
+        <div class="notes-sidebar-header">
+          <h2>Notes</h2>
+          <div class="notes-actions">
+            <button id="export-notes-btn" class="notes-action-btn" title="Export Notes">📤</button>
+            <button id="clear-notes-btn" class="notes-action-btn" title="Clear All Notes">🗑️</button>
+          </div>
+        </div>
+        <div class="notes-list" id="notes-list">
+          <div class="notes-empty-state">
+            <p>No notes yet</p>
+            <p class="notes-hint">Drag to select text from PDF pages to create notes</p>
+          </div>
+        </div>
+      </aside>
     </div>
   </body>
 </html>

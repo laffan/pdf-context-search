@@ -14,6 +14,7 @@
   --text-secondary: #475569;
   --border-color: #e2e8f0;
   --sidebar-width: 320px;
+  --notes-sidebar-width: 320px;
 }
 
 * {
@@ -465,6 +466,12 @@ body {
   border-radius: 1px;
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .export-link {
   font-size: 13px;
   color: var(--primary-color);
@@ -483,6 +490,30 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.toggle-notes-btn {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 10px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggle-notes-btn:hover {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.toggle-notes-btn.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
 }
 
 .results-header {
@@ -1141,4 +1172,209 @@ body {
     background-color: #334155; /* Dark gray background for pinned headers in dark mode */
     border-bottom: 2px solid var(--primary-color);
   }
+
+  .notes-sidebar {
+    background-color: var(--surface);
+    border-left: 1px solid var(--border-color);
+  }
+
+  .notes-empty-state {
+    color: var(--text-secondary);
+  }
+
+  .note-item {
+    background-color: var(--surface);
+    border: 1px solid var(--border-color);
+  }
+
+  .note-item:hover {
+    background-color: #1e293b;
+  }
+}
+
+/* Notes Sidebar */
+.notes-sidebar {
+  width: var(--notes-sidebar-width);
+  background-color: var(--surface);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+.notes-sidebar.collapsed {
+  width: 0;
+  opacity: 0;
+  border-left: none;
+}
+
+.notes-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.notes-sidebar-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.notes-action-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  line-height: 1;
+}
+
+.notes-action-btn:hover {
+  opacity: 1;
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-empty-state {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 48px 24px;
+}
+
+.notes-empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.notes-empty-state p:first-child {
+  font-weight: 500;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.notes-hint {
+  font-size: 13px;
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+.note-item {
+  background-color: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow 0.2s, background-color 0.2s;
+  cursor: default;
+}
+
+.note-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: #fafafa;
+}
+
+.note-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.note-source {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.note-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.note-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  padding: 8px;
+  background-color: var(--background);
+  border-radius: 4px;
+  border-left: 3px solid var(--primary-color);
+  max-height: 200px;
+  overflow-y: auto;
+  word-wrap: break-word;
+}
+
+.note-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.note-timestamp {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.note-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.note-action-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s, transform 0.1s;
+  line-height: 1;
+}
+
+.note-action-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.note-action-btn:active {
+  transform: scale(0.95);
+}
+
+/* Selection rectangle overlay for PDF text selection */
+.selection-overlay {
+  position: absolute;
+  border: 2px dashed var(--primary-color);
+  background-color: rgba(37, 99, 235, 0.1);
+  pointer-events: none;
+  z-index: 10;
 }

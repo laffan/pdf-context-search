@@ -61,6 +61,31 @@ interface PinnedResult {
 }
 const pinnedResults = new Map<string, PinnedResult>();
 
+// Notes feature
+interface Note {
+  id: string;
+  text: string;
+  filePath: string;
+  fileName: string;
+  pageNumber: number;
+  timestamp: string;
+  zoteroMetadata?: {
+    title: string;
+    authors: string;
+    year?: number;
+    citeKey?: string;
+    zoteroLink?: string;
+  };
+  selectionBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+const notes: Note[] = [];
+
 // DOM Elements
 let searchForm: HTMLFormElement;
 let searchQueriesContainer: HTMLElement;
@@ -77,6 +102,11 @@ let exportLink: HTMLAnchorElement;
 let statusMessage: HTMLElement;
 let resultsCount: HTMLElement;
 let resultsContainer: HTMLElement;
+let toggleNotesBtn: HTMLButtonElement;
+let notesSidebar: HTMLElement;
+let notesList: HTMLElement;
+let exportNotesBtn: HTMLButtonElement;
+let clearNotesBtn: HTMLButtonElement;
 
 let queryCount = 1;
 
@@ -174,6 +204,216 @@ function togglePinResult(filePath: string) {
   // Re-render results to reflect pinned state
   renderResults(currentResults);
 }
+
+// ===== Notes Functions =====
+
+function toggleNotesSidebar() {
+  const isCollapsed = notesSidebar.classList.toggle('collapsed');
+  toggleNotesBtn.classList.toggle('active');
+
+  // Save state to localStorage
+  localStorage.setItem('notesSidebarOpen', String(!isCollapsed));
+}
+
+function loadNotes() {
+  const stored = localStorage.getItem('pdfSearchNotes');
+  if (!stored) return;
+  try {
+    const loadedNotes = JSON.parse(stored);
+    notes.length = 0; // Clear existing notes
+    notes.push(...loadedNotes);
+    renderNotesList();
+  } catch (error) {
+    console.error('Failed to load notes:', error);
+  }
+}
+
+function saveNotes() {
+  localStorage.setItem('pdfSearchNotes', JSON.stringify(notes));
+}
+
+function createNote(text: string, filePath: string, fileName: string, pageNumber: number, zoteroMetadata?: ZoteroMetadata | null, selectionBox?: { x: number; y: number; width: number; height: number }) {
+  // Ensure text is at least 3 characters
+  if (text.trim().length < 3) {
+    return;
+  }
+
+  const note: Note = {
+    id: crypto.randomUUID(),
+    text: text.trim(),
+    filePath,
+    fileName,
+    pageNumber,
+    timestamp: new Date().toISOString(),
+    selectionBox
+  };
+
+  // Add Zotero metadata if available
+  if (zoteroMetadata) {
+    note.zoteroMetadata = {
+      title: zoteroMetadata.title || fileName,
+      authors: zoteroMetadata.authors || '',
+      year: zoteroMetadata.year ? parseInt(zoteroMetadata.year) : undefined,
+      citeKey: zoteroMetadata.citekey,
+      zoteroLink: zoteroMetadata.zotero_link
+    };
+  }
+
+  notes.unshift(note); // Add to beginning (newest first)
+  saveNotes();
+  renderNotesList();
+
+  // Show feedback
+  showStatus('Note added successfully!', 'success');
+}
+
+function deleteNote(id: string) {
+  const index = notes.findIndex(n => n.id === id);
+  if (index !== -1) {
+    notes.splice(index, 1);
+    saveNotes();
+    renderNotesList();
+  }
+}
+
+function clearAllNotes() {
+  if (notes.length === 0) return;
+
+  if (confirm(`Are you sure you want to delete all ${notes.length} notes? This action cannot be undone.`)) {
+    notes.length = 0;
+    saveNotes();
+    renderNotesList();
+    showStatus('All notes cleared', 'info');
+  }
+}
+
+function copyNoteText(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    showStatus('Note copied to clipboard!', 'success');
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    showStatus('Failed to copy note', 'error');
+  });
+}
+
+function exportNotesToMarkdown() {
+  if (notes.length === 0) {
+    showStatus('No notes to export', 'info');
+    return;
+  }
+
+  let markdown = '# Notes from PDF Search\n\n';
+
+  notes.forEach((note, index) => {
+    const title = note.zoteroMetadata?.title || note.fileName;
+    const authors = note.zoteroMetadata?.authors;
+    const year = note.zoteroMetadata?.year;
+
+    markdown += `## ${title}`;
+    if (authors || year) {
+      markdown += ' (';
+      if (authors) markdown += authors;
+      if (authors && year) markdown += ', ';
+      if (year) markdown += year;
+      markdown += ')';
+    }
+    markdown += '\n\n';
+
+    markdown += `**Page ${note.pageNumber}**\n\n`;
+    markdown += `> "${note.text}"\n\n`;
+    markdown += `*Added: ${formatTimestamp(note.timestamp)}*\n\n`;
+
+    if (index < notes.length - 1) {
+      markdown += '---\n\n';
+    }
+  });
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(markdown).then(() => {
+    showStatus(`Exported ${notes.length} notes to clipboard!`, 'success');
+  }).catch(err => {
+    console.error('Failed to export:', err);
+    showStatus('Failed to export notes', 'error');
+  });
+}
+
+function renderNotesList() {
+  if (notes.length === 0) {
+    notesList.innerHTML = `
+      <div class="notes-empty-state">
+        <p>No notes yet</p>
+        <p class="notes-hint">Drag to select text from PDF pages to create notes</p>
+      </div>
+    `;
+    return;
+  }
+
+  notesList.innerHTML = notes.map(note => {
+    const title = note.zoteroMetadata?.title || note.fileName;
+    const authors = note.zoteroMetadata?.authors;
+    const year = note.zoteroMetadata?.year;
+
+    let metaStr = '';
+    if (authors) metaStr += `<em>${authors}</em>`;
+    if (authors && year) metaStr += ', ';
+    if (year) metaStr += year;
+    if (metaStr) metaStr += ' • ';
+    metaStr += `p. ${note.pageNumber}`;
+
+    return `
+      <div class="note-item" data-note-id="${note.id}">
+        <div class="note-header">
+          <span class="note-source"><strong>${escapeHtml(title)}</strong></span>
+          <span class="note-meta">${metaStr}</span>
+        </div>
+        <div class="note-text">"${escapeHtml(note.text)}"</div>
+        <div class="note-footer">
+          <span class="note-timestamp">${formatTimestamp(note.timestamp)}</span>
+          <div class="note-actions">
+            <button class="note-action-btn copy-note-btn" title="Copy" data-note-id="${note.id}">📋</button>
+            <button class="note-action-btn delete-note-btn" title="Delete" data-note-id="${note.id}">🗑️</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Add event listeners to note action buttons
+  notesList.querySelectorAll('.copy-note-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = (e.currentTarget as HTMLElement).dataset.noteId!;
+      const note = notes.find(n => n.id === id);
+      if (note) copyNoteText(note.text);
+    });
+  });
+
+  notesList.querySelectorAll('.delete-note-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = (e.currentTarget as HTMLElement).dataset.noteId!;
+      if (confirm('Delete this note?')) {
+        deleteNote(id);
+      }
+    });
+  });
+}
+
+function formatTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+  return date.toLocaleDateString();
+}
+
+// ===== End Notes Functions =====
 
 function addSearchQueryItem(queryType: 'parallel' | 'filter' = 'parallel') {
   const container = searchQueriesContainer;
@@ -703,11 +943,11 @@ function renderResults(matches: SearchMatch[]) {
               }
 
               if (foundFilePath) {
-                loadPageImage(foundFilePath, pageNumber, queriesToUse)
-                  .then(canvas => {
+                loadPageImage(foundFilePath, pageNumber, queriesToUse, undefined)
+                  .then(element => {
                     if (pageElement.querySelector('canvas') === null && pageElement.querySelector('img') === null) {
                       pageElement.innerHTML = '';
-                      pageElement.appendChild(canvas);
+                      pageElement.appendChild(element);
                     }
                   })
                   .catch(() => {
@@ -911,10 +1151,10 @@ function renderResults(matches: SearchMatch[]) {
                   const match = pageId.match(/page-(.+)-(\d+)$/);
                   if (match) {
                     const pageNumber = parseInt(match[2]);
-                    loadPageImage(filePath, pageNumber, combinedQueries)
-                      .then(canvas => {
+                    loadPageImage(filePath, pageNumber, combinedQueries, undefined)
+                      .then(element => {
                         pageElement.innerHTML = '';
-                        pageElement.appendChild(canvas);
+                        pageElement.appendChild(element);
                       })
                       .catch(() => {
                         pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
@@ -984,10 +1224,10 @@ function renderResults(matches: SearchMatch[]) {
             const match = pageId.match(/page-(.+)-(\d+)$/);
             if (match) {
               const pageNumber = parseInt(match[2]);
-              loadPageImage(filePath, pageNumber, checkedQueries)
-                .then(canvas => {
+              loadPageImage(filePath, pageNumber, checkedQueries, undefined)
+                .then(element => {
                   pageElement.innerHTML = '';
-                  pageElement.appendChild(canvas);
+                  pageElement.appendChild(element);
                 })
                 .catch(() => {
                   pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
@@ -1098,9 +1338,9 @@ async function toggleCoverPage(filePath: string, button: HTMLButtonElement) {
       coverContainer.appendChild(wrapper);
 
       try {
-        const canvas = await loadPageImage(filePath, 1, []);
+        const element = await loadPageImage(filePath, 1, [], undefined);
         wrapper.innerHTML = '';
-        wrapper.appendChild(canvas);
+        wrapper.appendChild(element);
       } catch {
         wrapper.innerHTML = '<div class="page-preview-error">Failed to load cover page</div>';
       }
@@ -1252,7 +1492,7 @@ function hideSearchDropdown() {
   }
 }
 
-async function loadPageImage(filePath: string, pageNumber: number, queries: QueryItem[]): Promise<HTMLCanvasElement> {
+async function loadPageImage(filePath: string, pageNumber: number, queries: QueryItem[], match?: SearchMatch): Promise<HTMLElement> {
   try {
     // Read the PDF file from the backend (bypasses CORS issues)
     const pdfBytes = await invoke<number[]>('read_pdf_file', { filePath });
@@ -1285,7 +1525,7 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
 
     await page.render(renderContext).promise;
 
-    // Get text content for highlighting
+    // Get text content for highlighting and text selection
     const textContent = await page.getTextContent();
 
     // Highlight each search term with its respective color
@@ -1353,11 +1593,154 @@ async function loadPageImage(filePath: string, pageNumber: number, queries: Quer
       }
     }
 
-    return canvas;
+    // Create a container for the canvas with text selection capability
+    const container = document.createElement('div');
+    container.style.position = 'relative';
+    container.style.display = 'inline-block';
+    container.style.cursor = 'crosshair';
+    container.appendChild(canvas);
+
+    // Add text selection functionality
+    let isSelecting = false;
+    let startX = 0;
+    let startY = 0;
+    let selectionOverlay: HTMLDivElement | null = null;
+
+    container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // Only left click
+
+      isSelecting = true;
+      const rect = canvas.getBoundingClientRect();
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+
+      // Create selection overlay
+      selectionOverlay = document.createElement('div');
+      selectionOverlay.className = 'selection-overlay';
+      selectionOverlay.style.left = `${startX}px`;
+      selectionOverlay.style.top = `${startY}px`;
+      selectionOverlay.style.width = '0px';
+      selectionOverlay.style.height = '0px';
+      container.appendChild(selectionOverlay);
+
+      e.preventDefault();
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (!isSelecting || !selectionOverlay) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+
+      selectionOverlay.style.left = `${left}px`;
+      selectionOverlay.style.top = `${top}px`;
+      selectionOverlay.style.width = `${width}px`;
+      selectionOverlay.style.height = `${height}px`;
+    });
+
+    container.addEventListener('mouseup', (e) => {
+      if (!isSelecting) return;
+
+      isSelecting = false;
+
+      const rect = canvas.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
+
+      // Calculate selection box
+      const selectionBox = {
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        width: Math.abs(endX - startX),
+        height: Math.abs(endY - startY)
+      };
+
+      // Remove selection overlay
+      if (selectionOverlay) {
+        selectionOverlay.remove();
+        selectionOverlay = null;
+      }
+
+      // Only process if selection has meaningful size
+      if (selectionBox.width > 5 && selectionBox.height > 5) {
+        // Extract text from selection
+        const selectedText = extractTextFromSelection(textContent, selectionBox, viewport);
+
+        if (selectedText && selectedText.trim().length >= 3) {
+          // Get metadata for the note
+          const fileName = filePath.split('/').pop() || filePath;
+          const zoteroMetadata = match?.zotero_metadata || null;
+
+          // Create note
+          createNote(selectedText, filePath, fileName, pageNumber, zoteroMetadata, selectionBox);
+        }
+      }
+    });
+
+    // Cancel selection if mouse leaves
+    container.addEventListener('mouseleave', () => {
+      if (isSelecting && selectionOverlay) {
+        selectionOverlay.remove();
+        selectionOverlay = null;
+        isSelecting = false;
+      }
+    });
+
+    return container;
   } catch (error) {
     console.error(`Failed to render page ${pageNumber}:`, error);
     throw error;
   }
+}
+
+// Extract text from a selection box on a PDF page
+function extractTextFromSelection(textContent: any, selectionBox: { x: number; y: number; width: number; height: number }, viewport: any): string {
+  const selectedItems: string[] = [];
+
+  for (const item of textContent.items) {
+    if ('str' in item && item.str.trim()) {
+      const tx = item.transform;
+
+      // Calculate text bounding box
+      const fontHeight = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+      const left = tx[4];
+      const bottom = tx[5];
+      const right = left + item.width;
+      const top = bottom + fontHeight;
+
+      // Convert to viewport coordinates
+      const [x1, y1] = viewport.convertToViewportPoint(left, bottom);
+      const [x2, y2] = viewport.convertToViewportPoint(right, top);
+
+      const itemBox = {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1)
+      };
+
+      // Check if this text item overlaps with the selection
+      if (boxesOverlap(selectionBox, itemBox)) {
+        selectedItems.push(item.str);
+      }
+    }
+  }
+
+  return selectedItems.join(' ');
+}
+
+// Check if two boxes overlap
+function boxesOverlap(box1: { x: number; y: number; width: number; height: number }, box2: { x: number; y: number; width: number; height: number }): boolean {
+  return !(box1.x + box1.width < box2.x ||
+           box2.x + box2.width < box1.x ||
+           box1.y + box1.height < box2.y ||
+           box2.y + box2.height < box1.y);
 }
 
 async function performSearch(event: Event) {
@@ -1502,9 +1885,17 @@ window.addEventListener("DOMContentLoaded", () => {
   statusMessage = document.querySelector("#status-message")!;
   resultsCount = document.querySelector("#results-count")!;
   resultsContainer = document.querySelector("#results-container")!;
+  toggleNotesBtn = document.querySelector("#toggle-notes-btn")!;
+  notesSidebar = document.querySelector(".notes-sidebar")!;
+  notesList = document.querySelector("#notes-list")!;
+  exportNotesBtn = document.querySelector("#export-notes-btn")!;
+  clearNotesBtn = document.querySelector("#clear-notes-btn")!;
 
   // Load pinned results from localStorage
   loadPinnedResults();
+
+  // Load notes from localStorage
+  loadNotes();
 
   // Render pinned results if any exist
   if (pinnedResults.size > 0) {
@@ -1573,6 +1964,18 @@ window.addEventListener("DOMContentLoaded", () => {
       copyResults();
     }
   });
+
+  // Notes sidebar event listeners
+  toggleNotesBtn.addEventListener("click", toggleNotesSidebar);
+  exportNotesBtn.addEventListener("click", exportNotesToMarkdown);
+  clearNotesBtn.addEventListener("click", clearAllNotes);
+
+  // Restore notes sidebar state
+  const notesSidebarOpen = localStorage.getItem('notesSidebarOpen');
+  if (notesSidebarOpen === 'true') {
+    notesSidebar.classList.remove('collapsed');
+    toggleNotesBtn.classList.add('active');
+  }
 
   // Column layout icons event handlers
   document.querySelectorAll('.column-icon').forEach(icon => {
