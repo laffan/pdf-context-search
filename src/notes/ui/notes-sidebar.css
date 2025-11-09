@@ -28,23 +28,21 @@
 
 .notes-actions {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   align-items: center;
 }
 
-.notes-action-btn {
-  background: none;
-  border: none;
-  font-size: 16px;
+.notes-footer-link {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
   cursor: pointer;
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  line-height: 1;
+  transition: color 0.2s;
 }
 
-.notes-action-btn:hover {
-  opacity: 1;
+.notes-footer-link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
 }
 
 .notes-list {

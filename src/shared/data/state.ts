@@ -31,8 +31,8 @@ export let resultsContainer: HTMLElement;
 export let toggleNotesBtn: HTMLButtonElement;
 export let notesSidebar: HTMLElement;
 export let notesList: HTMLElement;
-export let exportNotesBtn: HTMLButtonElement;
-export let clearNotesBtn: HTMLButtonElement;
+export let exportNotesBtn: HTMLAnchorElement;
+export let clearNotesBtn: HTMLAnchorElement;
 
 export let queryCount = 1;
 

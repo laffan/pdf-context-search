@@ -130,8 +130,14 @@ window.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     toggleNotesSidebar();
   });
-  exportNotesBtn.addEventListener("click", exportNotesToMarkdown);
-  clearNotesBtn.addEventListener("click", () => clearAllNotes(renderNotesList));
+  exportNotesBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    exportNotesToMarkdown();
+  });
+  clearNotesBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    clearAllNotes(renderNotesList);
+  });
 
   // Restore notes sidebar state
   const notesSidebarOpen = localStorage.getItem('notesSidebarOpen');
