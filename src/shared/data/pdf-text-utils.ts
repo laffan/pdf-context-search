@@ -31,7 +31,14 @@ export function extractTextFromSelection(textContent: any, selectionBox: { x: nu
     }
   }
 
-  return selectedItems.join(' ');
+  return removeLineBreakHyphens(selectedItems.join(' '));
+}
+
+// Remove hyphens that occur at line breaks (word wrapping)
+function removeLineBreakHyphens(text: string): string {
+  // Remove hyphen followed by space (hyphen at end of line)
+  // Pattern: word- word -> wordword
+  return text.replace(/(\w)-\s+(\w)/g, '$1$2');
 }
 
 // Check if two boxes overlap

@@ -16,10 +16,13 @@ export function renderNotesList() {
   const groups = groupNotesBySource();
 
   notesList.innerHTML = groups.map(group => {
+    const groupId = group.filePath.replace(/[^a-zA-Z0-9]/g, '_');
     let groupHtml = `
       <div class="note-group">
-        <div class="note-group-header">
-          <strong>${escapeHtml(group.title)}</strong>`;
+        <div class="note-group-header" data-group-id="${groupId}">
+          <span class="note-group-toggle">▼</span>
+          <div class="note-group-title">
+            <strong>${escapeHtml(group.title)}</strong>`;
 
     if (group.authors || group.year) {
       groupHtml += '<br><span class="note-group-meta">';
@@ -30,8 +33,9 @@ export function renderNotesList() {
     }
 
     groupHtml += `
+          </div>
         </div>
-        <div class="note-group-items">`;
+        <div class="note-group-items" data-group-id="${groupId}">`;
 
     group.notes.forEach(note => {
       groupHtml += `
@@ -92,6 +96,26 @@ export function renderNotesList() {
       const id = (e.currentTarget as HTMLElement).dataset.noteId!;
       if (confirm('Delete this note?')) {
         deleteNote(id, renderNotesList);
+      }
+    });
+  });
+
+  // Add event listeners for accordion toggles
+  notesList.querySelectorAll('.note-group-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      const groupId = (e.currentTarget as HTMLElement).dataset.groupId!;
+      const items = notesList.querySelector(`.note-group-items[data-group-id="${groupId}"]`) as HTMLElement;
+      const toggle = header.querySelector('.note-group-toggle') as HTMLElement;
+
+      if (items && toggle) {
+        const isCollapsed = items.classList.contains('collapsed');
+        if (isCollapsed) {
+          items.classList.remove('collapsed');
+          toggle.textContent = '▼';
+        } else {
+          items.classList.add('collapsed');
+          toggle.textContent = '▶';
+        }
       }
     });
   });
