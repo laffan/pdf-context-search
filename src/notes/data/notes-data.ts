@@ -78,8 +78,18 @@ export function clearAllNotes(renderNotesListCallback?: () => void) {
   }
 }
 
-export function copyNoteText(text: string) {
-  navigator.clipboard.writeText(text).then(() => {
+export function copyNoteText(note: Note) {
+  let formattedText = '';
+
+  // Add page number as markdown link if Zotero link is available
+  if (note.zoteroLink) {
+    const zoteroPageLink = `${note.zoteroLink}?page=${note.pageNumber}`;
+    formattedText = `[Page ${note.pageNumber}](${zoteroPageLink})\n\n${note.text}`;
+  } else {
+    formattedText = `Page ${note.pageNumber}\n\n${note.text}`;
+  }
+
+  navigator.clipboard.writeText(formattedText).then(() => {
     showStatus('Note copied to clipboard!', 'success');
   }).catch(err => {
     console.error('Failed to copy:', err);
@@ -98,15 +108,12 @@ export function exportNotesToMarkdown() {
   const groups = groupNotesBySource();
 
   groups.forEach((group, groupIndex) => {
-    markdown += `## ${group.title}`;
-    if (group.authors || group.year) {
-      markdown += ' (';
-      if (group.authors) markdown += group.authors;
-      if (group.authors && group.year) markdown += ', ';
-      if (group.year) markdown += group.year;
-      markdown += ')';
+    markdown += `## ${group.title}\n\n`;
+
+    // Add Zotero link if available
+    if (group.zoteroLink) {
+      markdown += `${group.zoteroLink}\n\n`;
     }
-    markdown += '\n\n';
 
     group.notes.forEach((note) => {
       // Use markdown link if Zotero link is available

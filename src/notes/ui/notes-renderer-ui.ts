@@ -22,17 +22,7 @@ export function renderNotesList() {
         <div class="note-group-header" data-group-id="${groupId}">
           <span class="note-group-toggle">▼</span>
           <div class="note-group-title">
-            <strong>${escapeHtml(group.title)}</strong>`;
-
-    if (group.authors || group.year) {
-      groupHtml += '<br><span class="note-group-meta">';
-      if (group.authors) groupHtml += `<em>${escapeHtml(group.authors)}</em>`;
-      if (group.authors && group.year) groupHtml += ', ';
-      if (group.year) groupHtml += group.year;
-      groupHtml += '</span>';
-    }
-
-    groupHtml += `
+            <strong>${escapeHtml(group.title)}</strong>
           </div>
         </div>
         <div class="note-group-items" data-group-id="${groupId}">`;
@@ -87,7 +77,7 @@ export function renderNotesList() {
     btn.addEventListener('click', (e) => {
       const id = (e.currentTarget as HTMLElement).dataset.noteId!;
       const note = notes.find(n => n.id === id);
-      if (note) copyNoteText(note.text);
+      if (note) copyNoteText(note);
     });
   });
 
