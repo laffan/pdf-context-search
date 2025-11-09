@@ -2,7 +2,7 @@
 
 A Tauri-based desktop application for searching and highlighting text across multiple PDFs. Includes optional Zotero integration, multiple highlight modes and a little notebook bar.
 
-![Screenshot](screenshot.png)
+![Screenshot](screenshot-0.1.1.png)
 
 ## Development Quick Start
 
