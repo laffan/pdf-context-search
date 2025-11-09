@@ -80,8 +80,8 @@
 }
 
 .note-group-header {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  line-height: 16px;
   color: var(--text-primary);
   margin-bottom: 8px;
   padding-top: 8px;
