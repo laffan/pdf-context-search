@@ -18,10 +18,10 @@ export function saveNotes() {
   localStorage.setItem('pdfSearchNotes', JSON.stringify(notes));
 }
 
-export function createNote(text: string, filePath: string, fileName: string, pageNumber: number, zoteroMetadata?: ZoteroMetadata | null, selectionBox?: { x: number; y: number; width: number; height: number }, renderNotesListCallback?: () => void) {
+export function createNote(text: string, filePath: string, fileName: string, pageNumber: number, zoteroMetadata?: ZoteroMetadata | null, selectionBox?: { x: number; y: number; width: number; height: number }, renderNotesListCallback?: (noteId?: string) => void): string | undefined {
   // Ensure text is at least 3 characters
   if (text.trim().length < 3) {
-    return;
+    return undefined;
   }
 
   const note: Note = {
@@ -47,11 +47,13 @@ export function createNote(text: string, filePath: string, fileName: string, pag
   notes.push(note);
   saveNotes();
   if (renderNotesListCallback) {
-    renderNotesListCallback();
+    renderNotesListCallback(note.id);
   }
 
   // Show feedback
   showStatus('Note added successfully!', 'success');
+
+  return note.id;
 }
 
 export function deleteNote(id: string, renderNotesListCallback?: () => void) {
@@ -112,7 +114,7 @@ export function exportNotesToMarkdown() {
 
     // Add Zotero link if available
     if (group.zoteroLink) {
-      markdown += `${group.zoteroLink}\n\n`;
+      markdown += `[View in Zotero](${group.zoteroLink})\n\n`;
     }
 
     group.notes.forEach((note) => {

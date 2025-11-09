@@ -2,7 +2,7 @@ import { notes, notesList } from '../../shared/data/state';
 import { groupNotesBySource, saveNotes, deleteNote, copyNoteText } from '../data/notes-data';
 import { escapeHtml } from '../../shared/ui/html-utils';
 
-export function renderNotesList() {
+export function renderNotesList(scrollToNoteId?: string) {
   if (notes.length === 0) {
     notesList.innerHTML = `
       <div class="notes-empty-state">
@@ -109,4 +109,14 @@ export function renderNotesList() {
       }
     });
   });
+
+  // Scroll to the new note if specified
+  if (scrollToNoteId) {
+    setTimeout(() => {
+      const noteElement = notesList.querySelector(`[data-note-id="${scrollToNoteId}"]`);
+      if (noteElement) {
+        noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }
 }
