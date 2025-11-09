@@ -33,8 +33,8 @@ export function renderNotesList(scrollToNoteId?: string) {
           <div class="note-page">Page ${note.pageNumber}</div>
           <div class="note-text" contenteditable="true" data-note-id="${note.id}">${escapeHtml(note.text)}</div>
           <div class="note-actions">
-            <button class="note-action-btn copy-note-btn" title="Copy" data-note-id="${note.id}">📋</button>
-            <button class="note-action-btn delete-note-btn" title="Delete" data-note-id="${note.id}">🗑️</button>
+            <a href="#" class="note-action-link copy-note-btn" data-note-id="${note.id}">Copy</a>
+            <a href="#" class="note-action-link delete-note-btn" data-note-id="${note.id}">Delete</a>
           </div>
         </div>`;
     });
@@ -72,9 +72,10 @@ export function renderNotesList(scrollToNoteId?: string) {
     });
   });
 
-  // Add event listeners to note action buttons
+  // Add event listeners to note action links
   notesList.querySelectorAll('.copy-note-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const id = (e.currentTarget as HTMLElement).dataset.noteId!;
       const note = notes.find(n => n.id === id);
       if (note) copyNoteText(note);
@@ -83,6 +84,7 @@ export function renderNotesList(scrollToNoteId?: string) {
 
   notesList.querySelectorAll('.delete-note-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const id = (e.currentTarget as HTMLElement).dataset.noteId!;
       if (confirm('Delete this note?')) {
         deleteNote(id, renderNotesList);
