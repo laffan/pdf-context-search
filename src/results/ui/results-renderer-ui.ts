@@ -526,7 +526,14 @@ export function renderResults(matches: SearchMatch[]) {
                 </label>
               `;
               filtersContainer.appendChild(filterDiv);
+
+              // Force browser to render the "Searching..." text before starting the search
+              // This ensures the user sees the immediate feedback
+              void filterDiv.offsetHeight;
             }
+
+            // Clear input immediately
+            inputElement.value = '';
 
             // Search for this specific query to get match count
             try {
@@ -565,9 +572,6 @@ export function renderResults(matches: SearchMatch[]) {
                   });
                 }
               }
-
-              // Clear input
-              inputElement.value = '';
 
               // Now get all checked queries and render with them
               const checkedQueries: QueryItem[] = [];
