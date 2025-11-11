@@ -535,6 +535,10 @@ export function renderResults(matches: SearchMatch[]) {
             // Clear input immediately
             inputElement.value = '';
 
+            // Give the browser time to paint the "Searching..." text before starting the search
+            // This ensures the user sees immediate feedback even on fast searches
+            await new Promise(resolve => setTimeout(resolve, 0));
+
             // Search for this specific query to get match count
             try {
               const customQueryParams: SearchParams = {
