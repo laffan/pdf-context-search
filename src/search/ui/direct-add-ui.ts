@@ -6,6 +6,7 @@ import { showStatus } from '../../shared/ui/status-message';
 import { pinPdfDirectly } from './direct-add-pin';
 
 let searchTimeout: number | null = null;
+let currentResults: PdfListItem[] = [];
 
 export function initializeDirectAdd() {
   // Add input event listener with debouncing
@@ -25,7 +26,11 @@ export function initializeDirectAdd() {
     if (target.classList.contains('direct-add-pin-btn')) {
       const filePath = target.dataset.filePath;
       if (filePath) {
-        pinPdfDirectly(filePath);
+        // Find the full PdfListItem from current results
+        const item = currentResults.find(r => r.file_path === filePath);
+        if (item) {
+          pinPdfDirectly(item);
+        }
       }
     }
   });
@@ -61,6 +66,7 @@ async function performDirectSearch() {
     };
 
     const results = await invoke<PdfListItem[]>('list_pdf_files', { params });
+    currentResults = results;
     renderDirectAddResults(results);
   } catch (error) {
     console.error('Failed to search PDFs:', error);
