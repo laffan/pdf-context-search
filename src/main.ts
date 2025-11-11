@@ -29,6 +29,7 @@ import { addSearchQueryItem } from './search/ui/search-form-ui';
 import { browseDirectory, browseZoteroDirectory, toggleZoteroFolder } from './search/ui/directory-browser-ui';
 import { renderSearchDropdown, hideSearchDropdown } from './search/ui/search-dropdown-ui';
 import { initializeDirectAdd } from './search/ui/direct-add-ui';
+import { initializeSidebarSections } from './search/ui/sidebar-sections-ui';
 
 // ========== Results Imports ==========
 import { performSearch } from './results/data/search-executor-data';
@@ -49,6 +50,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 window.addEventListener("DOMContentLoaded", () => {
   // Initialize DOM elements
   initializeDomElements();
+
+  // Initialize sidebar sections (collapsible)
+  initializeSidebarSections();
 
   // Initialize direct add feature
   initializeDirectAdd();

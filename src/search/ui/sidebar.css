@@ -4,7 +4,7 @@
   width: var(--sidebar-width);
   background-color: var(--surface);
   border-right: 1px solid var(--border-color);
-  padding: 24px;
+  padding: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
