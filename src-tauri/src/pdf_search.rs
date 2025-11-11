@@ -31,6 +31,20 @@ pub struct SearchMatch {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdfListItem {
+    pub file_path: String,
+    pub file_name: String,
+    pub zotero_metadata: Option<ZoteroMetadata>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListPdfsParams {
+    pub directory: String,
+    pub search_query: Option<String>,
+    pub zotero_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryItem {
     pub query: String,
     pub use_regex: bool,
@@ -568,6 +582,103 @@ pub fn search_single_pdf(params: SearchParams) -> Result<Vec<SearchMatch>> {
         params.context_words,
         zotero_map.as_ref(),
     )
+}
+
+pub fn list_pdfs(params: ListPdfsParams) -> Result<Vec<PdfListItem>> {
+    let directory = PathBuf::from(&params.directory);
+
+    let pdf_files = find_pdf_files(&directory)?;
+
+    if pdf_files.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Build Zotero map if path is provided
+    let zotero_map = if let Some(ref zotero_path) = params.zotero_path {
+        let path = PathBuf::from(zotero_path);
+        match build_zotero_map(&path) {
+            Ok(map) => Some(map),
+            Err(e) => {
+                eprintln!("Warning: Failed to load Zotero database: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Create list items with metadata
+    let mut items: Vec<PdfListItem> = pdf_files
+        .iter()
+        .map(|pdf_path| {
+            let file_name = pdf_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            let zotero_metadata = zotero_map
+                .as_ref()
+                .and_then(|map| map.get(&file_name))
+                .cloned();
+
+            PdfListItem {
+                file_path: pdf_path.to_string_lossy().to_string(),
+                file_name,
+                zotero_metadata,
+            }
+        })
+        .collect();
+
+    // Apply fuzzy search filter if query is provided
+    if let Some(ref query) = params.search_query {
+        if !query.trim().is_empty() {
+            let search_lower = query.to_lowercase();
+
+            items.retain(|item| {
+                // Search in filename
+                if item.file_name.to_lowercase().contains(&search_lower) {
+                    return true;
+                }
+
+                // Search in Zotero metadata if available
+                if let Some(ref metadata) = item.zotero_metadata {
+                    // Search in title
+                    if let Some(ref title) = metadata.title {
+                        if title.to_lowercase().contains(&search_lower) {
+                            return true;
+                        }
+                    }
+
+                    // Search in authors
+                    if let Some(ref authors) = metadata.authors {
+                        if authors.to_lowercase().contains(&search_lower) {
+                            return true;
+                        }
+                    }
+
+                    // Search in year
+                    if let Some(ref year) = metadata.year {
+                        if year.contains(&search_lower) {
+                            return true;
+                        }
+                    }
+
+                    // Search in citekey
+                    if metadata.citekey.to_lowercase().contains(&search_lower) {
+                        return true;
+                    }
+                }
+
+                false
+            });
+        }
+    }
+
+    // Sort alphabetically by filename
+    items.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+
+    Ok(items)
 }
 
 pub fn export_to_markdown(matches: &[SearchMatch]) -> String {

@@ -1,6 +1,6 @@
 mod pdf_search;
 
-use pdf_search::{export_to_markdown, search_pdfs, search_single_pdf, SearchMatch, SearchParams};
+use pdf_search::{export_to_markdown, search_pdfs, search_single_pdf, list_pdfs, SearchMatch, SearchParams, PdfListItem, ListPdfsParams};
 use std::fs;
 
 #[tauri::command]
@@ -24,6 +24,11 @@ fn read_pdf_file(file_path: String) -> Result<Vec<u8>, String> {
     fs::read(&file_path).map_err(|e| format!("Failed to read PDF file: {}", e))
 }
 
+#[tauri::command]
+fn list_pdf_files(params: ListPdfsParams) -> Result<Vec<PdfListItem>, String> {
+    list_pdfs(params).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -33,7 +38,8 @@ pub fn run() {
             search_pdf_files,
             search_single_pdf_file,
             export_results_to_markdown,
-            read_pdf_file
+            read_pdf_file,
+            list_pdf_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

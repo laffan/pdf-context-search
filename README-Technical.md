@@ -75,6 +75,20 @@ Handles user input for search queries, directory selection, and search configura
 - Allows quick re-use of previous queries
 - Pattern: Absolute positioning with dynamic show/hide
 
+**`direct-add-ui.ts`**
+- Provides direct PDF adding functionality without full-text search
+- Implements fuzzy search across PDF filenames and Zotero metadata (title, authors, year, citekey)
+- Debounced input handling (300ms) for performance
+- Displays up to 50 results in scrollable container
+- Each result shows title/filename, metadata, and a "Pin" button
+- Pattern: Async search with debouncing, event delegation for pin buttons
+
+**`direct-add-pin.ts`**
+- Handles pinning PDFs directly to results without running a search
+- Creates minimal search to extract first page and metadata
+- Stores pinned results with empty query array to indicate direct add
+- Pattern: Async IPC with status feedback
+
 ### Search Data Layer (`src/search/data/`)
 
 **`search-queries-data.ts`**
@@ -293,6 +307,15 @@ fn read_pdf_file(file_path: String) -> Result<Vec<u8>, String>
 - Reads raw PDF bytes for frontend rendering with PDF.js
 - Bypasses CORS restrictions by serving files through Tauri
 
+```rust
+#[tauri::command]
+fn list_pdf_files(params: ListPdfsParams) -> Result<Vec<PdfListItem>, String>
+```
+- Lists all PDFs in a directory with optional fuzzy search filtering
+- Returns basic file info and Zotero metadata for each PDF
+- Supports search across filename, title, authors, year, and citekey
+- Used for direct add feature to pin PDFs without full-text search
+
 **Pattern:** Tauri commands as async RPC endpoints with serialization/deserialization
 
 ### `src-tauri/src/pdf_search.rs`
@@ -328,6 +351,13 @@ fn read_pdf_file(file_path: String) -> Result<Vec<u8>, String>
   - Query types: "parallel" (independent) or "filter" (sequential refinement)
 - Builds matches with context (N words before/after)
 - Attaches Zotero metadata when available
+
+**`list_pdfs(params: ListPdfsParams)`**
+- Lists all PDFs in a directory with optional fuzzy search
+- Loads Zotero metadata if available
+- Filters results by search query (searches filename and Zotero fields)
+- Returns sorted list of `PdfListItem` with file path and metadata
+- Pattern: Functional filtering with case-insensitive string matching
 
 **`export_to_markdown(matches: &[SearchMatch])`**
 - Formats search results as Markdown

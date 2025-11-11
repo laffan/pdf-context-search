@@ -33,6 +33,8 @@ export let notesSidebar: HTMLElement;
 export let notesList: HTMLElement;
 export let exportNotesBtn: HTMLAnchorElement;
 export let clearNotesBtn: HTMLAnchorElement;
+export let directAddInput: HTMLInputElement;
+export let directAddResults: HTMLElement;
 
 export let queryCount = 1;
 
@@ -63,6 +65,8 @@ export function initializeDomElements() {
   notesList = document.querySelector("#notes-list")!;
   exportNotesBtn = document.querySelector("#export-notes-btn")!;
   clearNotesBtn = document.querySelector("#clear-notes-btn")!;
+  directAddInput = document.querySelector("#direct-add-search")!;
+  directAddResults = document.querySelector("#direct-add-results")!;
 }
 
 // Function to increment and get queryCount

@@ -3,7 +3,29 @@
 #search-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
+}
+
+/* Sidebar Sections */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-section:last-of-type {
+  border-bottom: none;
+}
+
+.section-header {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Multi-query search UI */
@@ -131,4 +153,104 @@
 .add-filter-link:hover {
   opacity: 0.7;
   text-decoration: underline;
+}
+
+/* Add Directly Section */
+.direct-add-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.direct-add-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.direct-add-results {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--surface);
+  margin-top: 8px;
+  display: none; /* Hidden by default */
+}
+
+.direct-add-results.has-results {
+  display: block;
+}
+
+.direct-add-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+}
+
+.direct-add-result-item:last-child {
+  border-bottom: none;
+}
+
+.direct-add-result-item:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.direct-add-result-info {
+  flex: 1;
+  min-width: 0; /* Allows text truncation */
+}
+
+.direct-add-result-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.direct-add-result-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.direct-add-pin-btn {
+  padding: 4px 12px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.direct-add-pin-btn:hover {
+  opacity: 0.8;
+}
+
+.direct-add-pin-btn:active {
+  transform: scale(0.95);
+}
+
+.direct-add-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
 }

@@ -71,3 +71,15 @@ export interface NoteGroup {
   zoteroLink?: string;
   notes: Note[];
 }
+
+export interface PdfListItem {
+  file_path: string;
+  file_name: string;
+  zotero_metadata: ZoteroMetadata | null;
+}
+
+export interface ListPdfsParams {
+  directory: string;
+  search_query: string | null;
+  zotero_path: string | null;
+}
