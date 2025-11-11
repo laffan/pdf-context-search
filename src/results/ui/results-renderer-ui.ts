@@ -510,6 +510,24 @@ export function renderResults(matches: SearchMatch[]) {
             const nextColorIndex = existingFilterCheckboxes.length;
             const customQueryColor = getColorForQuery(nextColorIndex, 'parallel');
 
+            // Create checkbox immediately with "Searching..." label
+            const filtersContainer = filterBar.querySelector('.result-matches-query-filters');
+            const checkboxId = `query-filter-custom-${fileId}-${Date.now()}`;
+            let filterDiv: HTMLDivElement | null = null;
+
+            if (filtersContainer) {
+              filterDiv = document.createElement('div');
+              filterDiv.className = 'result-matches-query-filter custom-query';
+              filterDiv.innerHTML = `
+                <input type="checkbox" id="${checkboxId}" data-query-type="custom" data-query="${escapeHtml(searchQuery)}" data-color="${customQueryColor}" checked />
+                <label for="${checkboxId}">
+                  <span class="query-color-indicator" style="background-color: ${customQueryColor};"></span>
+                  ${escapeHtml(searchQuery)} - Searching...
+                </label>
+              `;
+              filtersContainer.appendChild(filterDiv);
+            }
+
             // Search for this specific query to get match count
             try {
               const customQueryParams: SearchParams = {
@@ -527,30 +545,25 @@ export function renderResults(matches: SearchMatch[]) {
               const customResults = await invoke<SearchMatch[]>('search_single_pdf_file', { params: customQueryParams });
               const matchCount = customResults.length;
 
-              // Create new checkbox with Remove link
-              const filtersContainer = filterBar.querySelector('.result-matches-query-filters');
-              if (filtersContainer) {
-                const checkboxId = `query-filter-custom-${fileId}-${Date.now()}`;
-                const filterDiv = document.createElement('div');
-                filterDiv.className = 'result-matches-query-filter custom-query';
-                filterDiv.innerHTML = `
-                  <input type="checkbox" id="${checkboxId}" data-query-type="custom" data-query="${escapeHtml(searchQuery)}" data-color="${customQueryColor}" checked />
-                  <label for="${checkboxId}">
+              // Update the checkbox label with actual match count
+              if (filterDiv) {
+                const label = filterDiv.querySelector('label');
+                if (label) {
+                  label.innerHTML = `
                     <span class="query-color-indicator" style="background-color: ${customQueryColor};"></span>
                     ${escapeHtml(searchQuery)} - ${matchCount} <a href="#" class="remove-custom-query" data-checkbox-id="${checkboxId}">(Remove)</a>
-                  </label>
-                `;
-                filtersContainer.appendChild(filterDiv);
+                  `;
 
-                // Add remove link event listener
-                const removeLink = filterDiv.querySelector('.remove-custom-query');
-                removeLink?.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  filterDiv.remove();
-                  // Trigger checkbox change to re-render
-                  const changeEvent = new Event('change', { bubbles: true });
-                  filterBar.dispatchEvent(changeEvent);
-                });
+                  // Add remove link event listener
+                  const removeLink = label.querySelector('.remove-custom-query');
+                  removeLink?.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    filterDiv?.remove();
+                    // Trigger checkbox change to re-render
+                    const changeEvent = new Event('change', { bubbles: true });
+                    filterBar.dispatchEvent(changeEvent);
+                  });
+                }
               }
 
               // Clear input
