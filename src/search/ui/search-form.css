@@ -3,16 +3,13 @@
 #search-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
 }
 
 /* Sidebar Sections */
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 24px;
-  padding-bottom: 16px;
+  padding: 15px 24px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -40,8 +37,11 @@
   color: var(--text-primary);
 }
 
+.section-header:has(+ .section-content:not(.open)) {
+  margin-bottom: 0;
+}
+
 .section-header-arrow {
-  margin-left: -20px;
   font-size: 12px;
   display: inline-block;
   transition: transform 0.2s;
