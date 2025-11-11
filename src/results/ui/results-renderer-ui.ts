@@ -597,35 +597,30 @@ export function renderResults(matches: SearchMatch[]) {
                 }
               });
 
-              // Combine all results: original + current + custom
-              const perPdfResults = customResults;
+              // For per-PDF search, we need to search for ALL checked queries
+              // and show ALL pages that match ANY of them (not merge with main search results)
+              let allPerPdfResults: SearchMatch[] = [];
 
-              // Combine results and remove duplicates by page number
-              const pageSet = new Set<number>();
-              const mergedResults: SearchMatch[] = [];
-
-              // 1. Add results from current search
-              const currentSearchResults = currentResults.filter(m => m.file_path === filePath);
-              currentSearchResults.forEach(result => {
-                if (!pageSet.has(result.page_number)) {
-                  pageSet.add(result.page_number);
-                  mergedResults.push(result);
+              // Search for each checked query
+              for (const queryItem of checkedQueries) {
+                try {
+                  const queryParams: SearchParams = {
+                    queries: [queryItem],
+                    directory: filePath,
+                    context_words: 100,
+                    zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+                  };
+                  const results = await invoke<SearchMatch[]>('search_single_pdf_file', { params: queryParams });
+                  allPerPdfResults = allPerPdfResults.concat(results);
+                } catch (error) {
+                  console.error(`Failed to search for query "${queryItem.query}":`, error);
                 }
-              });
-
-              // 2. Add results from original pinned search (if this PDF is pinned)
-              if (pinnedResults.has(filePath)) {
-                const pinnedData = pinnedResults.get(filePath)!;
-                pinnedData.matches.forEach(result => {
-                  if (!pageSet.has(result.page_number)) {
-                    pageSet.add(result.page_number);
-                    mergedResults.push(result);
-                  }
-                });
               }
 
-              // 3. Add per-PDF search results (for pages not already included)
-              perPdfResults.forEach((result: SearchMatch) => {
+              // Remove duplicate pages (keep first occurrence)
+              const pageSet = new Set<number>();
+              const mergedResults: SearchMatch[] = [];
+              allPerPdfResults.forEach(result => {
                 if (!pageSet.has(result.page_number)) {
                   pageSet.add(result.page_number);
                   mergedResults.push(result);
