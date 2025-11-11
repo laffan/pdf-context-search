@@ -486,8 +486,12 @@ export function renderResults(matches: SearchMatch[]) {
   });
 
   // Set up event listeners for per-PDF search inputs
+  // Remove any existing listeners by cloning and replacing elements to avoid duplicates
   document.querySelectorAll('.result-matches-search-input').forEach(input => {
-    input.addEventListener('keydown', async (e: Event) => {
+    const newInput = input.cloneNode(true) as HTMLInputElement;
+    input.parentNode?.replaceChild(newInput, input);
+
+    newInput.addEventListener('keydown', async (e: Event) => {
       const keyEvent = e as KeyboardEvent;
       if (keyEvent.key === 'Enter') {
         e.preventDefault();
