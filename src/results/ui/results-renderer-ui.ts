@@ -597,12 +597,20 @@ export function renderResults(matches: SearchMatch[]) {
                 }
               });
 
-              // For per-PDF search, we need to search for ALL checked queries
-              // and show ALL pages that match ANY of them (not merge with main search results)
-              let allPerPdfResults: SearchMatch[] = [];
+              console.log('Per-PDF search - checked queries:', checkedQueries.map(q => q.query));
+              console.log('Per-PDF search - initial customResults count:', customResults.length);
 
-              // Search for each checked query
+              // For per-PDF search, we need to search for ALL checked queries
+              // Start with the customResults we already have from the new query
+              let allPerPdfResults: SearchMatch[] = [...customResults];
+
+              // Search for any OTHER checked queries (excluding the one we just searched for)
               for (const queryItem of checkedQueries) {
+                // Skip the query we just searched for (to avoid duplicate search)
+                if (queryItem.query === searchQuery) {
+                  continue;
+                }
+
                 try {
                   const queryParams: SearchParams = {
                     queries: [queryItem],
@@ -610,12 +618,16 @@ export function renderResults(matches: SearchMatch[]) {
                     context_words: 100,
                     zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
                   };
+                  console.log(`Searching for additional query "${queryItem.query}"...`);
                   const results = await invoke<SearchMatch[]>('search_single_pdf_file', { params: queryParams });
+                  console.log(`Got ${results.length} results for "${queryItem.query}"`);
                   allPerPdfResults = allPerPdfResults.concat(results);
                 } catch (error) {
                   console.error(`Failed to search for query "${queryItem.query}":`, error);
                 }
               }
+
+              console.log('Per-PDF search - total results before dedup:', allPerPdfResults.length);
 
               // Remove duplicate pages (keep first occurrence)
               const pageSet = new Set<number>();
@@ -629,6 +641,8 @@ export function renderResults(matches: SearchMatch[]) {
 
               // Sort by page number
               mergedResults.sort((a, b) => a.page_number - b.page_number);
+
+              console.log('Per-PDF search - final merged results:', mergedResults.length, 'unique pages');
 
               // Re-render this PDF's matches with the merged results
               if (matchesContainer && mergedResults.length > 0) {
