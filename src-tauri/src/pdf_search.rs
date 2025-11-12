@@ -1,12 +1,11 @@
 use anyhow::{Context, Result};
 use lopdf::Document;
+use pdfium_render::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
-use reqwest::blocking::Client;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -70,24 +69,6 @@ pub struct SearchParams {
     pub directory: String,
     pub context_words: usize,
     pub zotero_path: Option<String>,
-}
-
-// Ferrules API response structures
-#[derive(Debug, Deserialize)]
-struct FerrulesResponse {
-    success: bool,
-    data: Option<FerrulesData>,
-    error: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct FerrulesData {
-    pages: Vec<FerrulesPage>,
-}
-
-#[derive(Debug, Deserialize)]
-struct FerrulesPage {
-    text: String,
 }
 
 pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
@@ -300,16 +281,16 @@ fn extract_year(date: &Option<String>) -> Option<String> {
 }
 
 fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    // Try ferrules HTTP API first (better text extraction)
-    match extract_with_ferrules(pdf_path) {
+    // Try pdfium first (better text extraction)
+    match extract_with_pdfium(pdf_path) {
         Ok(pages) => {
-            eprintln!("Successfully extracted text using ferrules for: {}",
+            eprintln!("Successfully extracted text using pdfium for: {}",
                      pdf_path.file_name().unwrap_or_default().to_string_lossy());
             Ok(pages)
         }
         Err(e) => {
-            // Fallback to lopdf if ferrules fails
-            eprintln!("Warning: ferrules extraction failed for {}, falling back to lopdf: {}",
+            // Fallback to lopdf if pdfium fails
+            eprintln!("Warning: pdfium extraction failed for {}, falling back to lopdf: {}",
                      pdf_path.display(), e);
 
             let doc = Document::load(pdf_path)
@@ -341,59 +322,39 @@ fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
     }
 }
 
-fn extract_with_ferrules(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    let client = Client::new();
-    let ferrules_url = "http://localhost:3002/parse";
+fn extract_with_pdfium(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
+    // Initialize pdfium
+    let pdfium = Pdfium::new(
+        Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
+            .or_else(|_| Pdfium::bind_to_system_library())
+            .context("Failed to load PDFium library")?
+    );
 
-    // Read the PDF file
-    let pdf_bytes = fs::read(pdf_path)
-        .context("Failed to read PDF file")?;
+    // Open the PDF document
+    let document = pdfium.load_pdf_from_file(pdf_path, None)
+        .context("Failed to open PDF with pdfium")?;
 
-    let file_name = pdf_path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("document.pdf");
-
-    // Create multipart form
-    let form = reqwest::blocking::multipart::Form::new()
-        .part("file",
-              reqwest::blocking::multipart::Part::bytes(pdf_bytes)
-                  .file_name(file_name.to_string())
-                  .mime_str("application/pdf")?);
-
-    // Send request to ferrules
-    let response = client
-        .post(ferrules_url)
-        .multipart(form)
-        .send()
-        .context("Failed to send request to ferrules")?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Ferrules returned error status: {}", response.status()));
-    }
-
-    // Parse JSON response
-    let ferrules_response: FerrulesResponse = response.json()
-        .context("Failed to parse ferrules response")?;
-
-    if !ferrules_response.success {
-        let error_msg = ferrules_response.error.unwrap_or_else(|| "Unknown error".to_string());
-        return Err(anyhow::anyhow!("Ferrules API error: {}", error_msg));
-    }
-
-    let data = ferrules_response.data
-        .ok_or_else(|| anyhow::anyhow!("No data in ferrules response"))?;
-
-    // Convert ferrules pages to our format (1-indexed)
     let mut pages = Vec::new();
-    for (idx, page) in data.pages.iter().enumerate() {
-        let page_num = idx + 1; // 1-indexed
-        let char_count = page.text.len();
-        let word_count = page.text.split_whitespace().count();
-        eprintln!("Page {} of {}: extracted {} chars, {} words (ferrules). First 100 chars: {:?}",
+    let page_count = document.pages().len();
+
+    for page_index in 0..page_count {
+        let page = document.pages().get(page_index)
+            .context(format!("Failed to get page {}", page_index + 1))?;
+
+        let text = page.text()
+            .context(format!("Failed to extract text from page {}", page_index + 1))?
+            .all();
+
+        let page_num = page_index + 1; // 1-indexed
+        let char_count = text.len();
+        let word_count = text.split_whitespace().count();
+
+        eprintln!("Page {} of {}: extracted {} chars, {} words (pdfium). First 100 chars: {:?}",
                  page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
                  char_count, word_count,
-                 if page.text.len() > 100 { &page.text[..100] } else { &page.text });
-        pages.push((page_num, page.text.clone()));
+                 if text.len() > 100 { &text[..100] } else { &text });
+
+        pages.push((page_num, text));
     }
 
     Ok(pages)
