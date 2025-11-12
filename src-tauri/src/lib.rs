@@ -1,7 +1,10 @@
 mod pdf_search;
+mod ferrules_manager;
 
+use ferrules_manager::FerrulesManager;
 use pdf_search::{export_to_markdown, search_pdfs, search_single_pdf, list_pdfs, SearchMatch, SearchParams, PdfListItem, ListPdfsParams};
 use std::fs;
+use std::sync::Mutex;
 
 #[tauri::command]
 fn search_pdf_files(params: SearchParams) -> Result<Vec<SearchMatch>, String> {
@@ -31,9 +34,19 @@ fn list_pdf_files(params: ListPdfsParams) -> Result<Vec<PdfListItem>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize ferrules manager
+    let mut ferrules = FerrulesManager::new();
+
+    // Start ferrules server (will fall back to lopdf if it fails)
+    if let Err(e) = ferrules.start() {
+        eprintln!("Warning: Failed to start ferrules: {}. Will use lopdf fallback.", e);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(Mutex::new(ferrules))
         .invoke_handler(tauri::generate_handler![
             search_pdf_files,
             search_single_pdf_file,
