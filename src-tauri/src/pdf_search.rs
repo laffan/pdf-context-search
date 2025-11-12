@@ -291,8 +291,10 @@ fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
             Ok(text) => {
                 pages.push((page_num, text));
             }
-            Err(_) => {
-                // Skip pages that can't be extracted
+            Err(e) => {
+                // Log extraction failure and push empty string
+                eprintln!("Warning: Failed to extract text from page {} of {}: {}",
+                         page_num, pdf_path.display(), e);
                 pages.push((page_num, String::new()));
             }
         }
