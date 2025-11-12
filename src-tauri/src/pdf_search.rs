@@ -2,11 +2,9 @@ use anyhow::{Context, Result};
 use lopdf::Document;
 use rayon::prelude::*;
 use regex::Regex;
-use reqwest::blocking::Client;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -70,24 +68,6 @@ pub struct SearchParams {
     pub directory: String,
     pub context_words: usize,
     pub zotero_path: Option<String>,
-}
-
-// Ferrules API response structures
-#[derive(Debug, Deserialize)]
-struct FerrulesResponse {
-    success: bool,
-    data: Option<FerrulesData>,
-    error: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct FerrulesData {
-    pages: Vec<FerrulesPage>,
-}
-
-#[derive(Debug, Deserialize)]
-struct FerrulesPage {
-    text: String,
 }
 
 pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
@@ -342,58 +322,47 @@ fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
 }
 
 fn extract_with_ferrules(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    let client = Client::new();
-    let ferrules_url = "http://localhost:3002/parse";
+    use std::process::Command;
 
-    // Read the PDF file
-    let pdf_bytes = fs::read(pdf_path)
-        .context("Failed to read PDF file")?;
+    // First get page count using lopdf
+    let doc = Document::load(pdf_path)
+        .context("Failed to load PDF to get page count")?;
+    let page_count = doc.get_pages().len();
 
-    let file_name = pdf_path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("document.pdf");
+    eprintln!("Extracting {} pages from {} using ferrules CLI",
+             page_count, pdf_path.file_name().unwrap_or_default().to_string_lossy());
 
-    // Create multipart form
-    let form = reqwest::blocking::multipart::Form::new()
-        .part("file",
-              reqwest::blocking::multipart::Part::bytes(pdf_bytes)
-                  .file_name(file_name.to_string())
-                  .mime_str("application/pdf")?);
-
-    // Send request to ferrules
-    let response = client
-        .post(ferrules_url)
-        .multipart(form)
-        .send()
-        .context("Failed to send request to ferrules")?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Ferrules returned error status: {}", response.status()));
-    }
-
-    // Parse JSON response
-    let ferrules_response: FerrulesResponse = response.json()
-        .context("Failed to parse ferrules response")?;
-
-    if !ferrules_response.success {
-        let error_msg = ferrules_response.error.unwrap_or_else(|| "Unknown error".to_string());
-        return Err(anyhow::anyhow!("Ferrules API error: {}", error_msg));
-    }
-
-    let data = ferrules_response.data
-        .ok_or_else(|| anyhow::anyhow!("No data in ferrules response"))?;
-
-    // Convert ferrules pages to our format (1-indexed)
     let mut pages = Vec::new();
-    for (idx, page) in data.pages.iter().enumerate() {
-        let page_num = idx + 1; // 1-indexed
-        let char_count = page.text.len();
-        let word_count = page.text.split_whitespace().count();
+
+    // Extract each page individually using ferrules --page-range
+    for page_num in 1..=page_count {
+        let output = Command::new("ferrules")
+            .arg(pdf_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid path"))?)
+            .arg("--page-range")
+            .arg(page_num.to_string())
+            .arg("--md")  // Output as markdown
+            .output()
+            .context(format!("Failed to execute ferrules for page {}", page_num))?;
+
+        if !output.status.success() {
+            eprintln!("Warning: ferrules failed for page {} of {}: {}",
+                     page_num, pdf_path.display(),
+                     String::from_utf8_lossy(&output.stderr));
+            pages.push((page_num, String::new()));
+            continue;
+        }
+
+        let text = String::from_utf8(output.stdout)
+            .unwrap_or_else(|_| String::new());
+
+        let char_count = text.len();
+        let word_count = text.split_whitespace().count();
         eprintln!("Page {} of {}: extracted {} chars, {} words (ferrules). First 100 chars: {:?}",
                  page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
                  char_count, word_count,
-                 if page.text.len() > 100 { &page.text[..100] } else { &page.text });
-        pages.push((page_num, page.text.clone()));
+                 if text.len() > 100 { &text[..100] } else { &text });
+
+        pages.push((page_num, text));
     }
 
     Ok(pages)

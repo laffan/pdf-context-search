@@ -1,58 +1,41 @@
 use anyhow::{Context, Result};
-use std::process::{Child, Command};
-use std::thread;
-use std::time::Duration;
+use std::path::Path;
+use std::process::Command;
 
-pub struct FerrulesManager {
-    process: Option<Child>,
-}
+pub struct FerrulesManager;
 
 impl FerrulesManager {
     pub fn new() -> Self {
-        FerrulesManager { process: None }
+        FerrulesManager
     }
 
-    pub fn start(&mut self) -> Result<()> {
-        eprintln!("Starting ferrules server...");
+    /// Check if ferrules is available
+    pub fn is_available(&self) -> bool {
+        Command::new("ferrules")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
 
-        // Try to start ferrules from the bundled binary or system PATH
-        let child = Command::new("ferrules")
-            .arg("--port")
-            .arg("3002")
-            .spawn()
-            .context("Failed to start ferrules. Make sure ferrules binary is available.")?;
+    /// Extract text from a PDF file using ferrules CLI
+    pub fn extract_text(&self, pdf_path: &Path) -> Result<String> {
+        eprintln!("Calling ferrules CLI for: {}", pdf_path.display());
 
-        self.process = Some(child);
+        // Call ferrules to parse the PDF and output as markdown
+        let output = Command::new("ferrules")
+            .arg(pdf_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid path"))?)
+            .arg("--md")  // Output as markdown for easier text extraction
+            .output()
+            .context("Failed to execute ferrules command")?;
 
-        // Wait a bit for ferrules to start up
-        eprintln!("Waiting for ferrules to initialize...");
-        thread::sleep(Duration::from_secs(2));
-
-        // Test connection
-        match reqwest::blocking::get("http://localhost:3002/health") {
-            Ok(_) => {
-                eprintln!("Ferrules server started successfully on port 3002");
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Warning: Ferrules may not be ready yet: {}", e);
-                Ok(())  // Don't fail, just warn
-            }
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Ferrules failed: {}", stderr));
         }
-    }
 
-    pub fn stop(&mut self) {
-        if let Some(mut child) = self.process.take() {
-            eprintln!("Stopping ferrules server...");
-            let _ = child.kill();
-            let _ = child.wait();
-            eprintln!("Ferrules server stopped");
-        }
-    }
-}
+        let text = String::from_utf8(output.stdout)
+            .context("Failed to parse ferrules output as UTF-8")?;
 
-impl Drop for FerrulesManager {
-    fn drop(&mut self) {
-        self.stop();
+        Ok(text)
     }
 }
