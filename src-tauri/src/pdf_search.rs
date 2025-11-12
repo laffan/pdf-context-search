@@ -1,11 +1,12 @@
 use anyhow::{Context, Result};
 use lopdf::Document;
-use ferrules::Pdf;
 use rayon::prelude::*;
 use regex::Regex;
+use reqwest::blocking::Client;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -69,6 +70,24 @@ pub struct SearchParams {
     pub directory: String,
     pub context_words: usize,
     pub zotero_path: Option<String>,
+}
+
+// Ferrules API response structures
+#[derive(Debug, Deserialize)]
+struct FerrulesResponse {
+    success: bool,
+    data: Option<FerrulesData>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FerrulesData {
+    pages: Vec<FerrulesPage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FerrulesPage {
+    text: String,
 }
 
 pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
@@ -281,35 +300,16 @@ fn extract_year(date: &Option<String>) -> Option<String> {
 }
 
 fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    // Try ferrules first (better text extraction)
-    match Pdf::new(pdf_path) {
-        Ok(pdf) => {
-            eprintln!("Using ferrules for text extraction: {}", pdf_path.file_name().unwrap_or_default().to_string_lossy());
-            let mut pages = Vec::new();
-
-            for page_num in 0..pdf.page_count() {
-                match pdf.extract_text(&[page_num]) {
-                    Ok(text) => {
-                        let char_count = text.len();
-                        let word_count = text.split_whitespace().count();
-                        eprintln!("Page {} of {}: extracted {} chars, {} words. First 100 chars: {:?}",
-                                 page_num + 1, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
-                                 char_count, word_count,
-                                 if text.len() > 100 { &text[..100] } else { &text });
-                        pages.push((page_num + 1, text)); // page_num + 1 because ferrules is 0-indexed
-                    }
-                    Err(e) => {
-                        eprintln!("Warning: ferrules failed to extract page {} of {}: {}",
-                                 page_num + 1, pdf_path.display(), e);
-                        pages.push((page_num + 1, String::new()));
-                    }
-                }
-            }
+    // Try ferrules HTTP API first (better text extraction)
+    match extract_with_ferrules(pdf_path) {
+        Ok(pages) => {
+            eprintln!("Successfully extracted text using ferrules for: {}",
+                     pdf_path.file_name().unwrap_or_default().to_string_lossy());
             Ok(pages)
         }
         Err(e) => {
             // Fallback to lopdf if ferrules fails
-            eprintln!("Warning: ferrules failed to load {}, falling back to lopdf: {}",
+            eprintln!("Warning: ferrules extraction failed for {}, falling back to lopdf: {}",
                      pdf_path.display(), e);
 
             let doc = Document::load(pdf_path)
@@ -339,6 +339,64 @@ fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
             Ok(pages)
         }
     }
+}
+
+fn extract_with_ferrules(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
+    let client = Client::new();
+    let ferrules_url = "http://localhost:3002/parse";
+
+    // Read the PDF file
+    let pdf_bytes = fs::read(pdf_path)
+        .context("Failed to read PDF file")?;
+
+    let file_name = pdf_path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("document.pdf");
+
+    // Create multipart form
+    let form = reqwest::blocking::multipart::Form::new()
+        .part("file",
+              reqwest::blocking::multipart::Part::bytes(pdf_bytes)
+                  .file_name(file_name.to_string())
+                  .mime_str("application/pdf")?);
+
+    // Send request to ferrules
+    let response = client
+        .post(ferrules_url)
+        .multipart(form)
+        .send()
+        .context("Failed to send request to ferrules")?;
+
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!("Ferrules returned error status: {}", response.status()));
+    }
+
+    // Parse JSON response
+    let ferrules_response: FerrulesResponse = response.json()
+        .context("Failed to parse ferrules response")?;
+
+    if !ferrules_response.success {
+        let error_msg = ferrules_response.error.unwrap_or_else(|| "Unknown error".to_string());
+        return Err(anyhow::anyhow!("Ferrules API error: {}", error_msg));
+    }
+
+    let data = ferrules_response.data
+        .ok_or_else(|| anyhow::anyhow!("No data in ferrules response"))?;
+
+    // Convert ferrules pages to our format (1-indexed)
+    let mut pages = Vec::new();
+    for (idx, page) in data.pages.iter().enumerate() {
+        let page_num = idx + 1; // 1-indexed
+        let char_count = page.text.len();
+        let word_count = page.text.split_whitespace().count();
+        eprintln!("Page {} of {}: extracted {} chars, {} words (ferrules). First 100 chars: {:?}",
+                 page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
+                 char_count, word_count,
+                 if page.text.len() > 100 { &page.text[..100] } else { &page.text });
+        pages.push((page_num, page.text.clone()));
+    }
+
+    Ok(pages)
 }
 
 fn split_into_words(text: &str) -> Vec<String> {
