@@ -345,7 +345,7 @@ fn extract_with_pdfium(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
             .context(format!("Failed to extract text from page {}", page_index + 1))?
             .all();
 
-        let page_num = page_index + 1; // 1-indexed
+        let page_num = (page_index + 1) as usize; // 1-indexed, convert to usize
         let char_count = text.len();
         let word_count = text.split_whitespace().count();
 
