@@ -289,11 +289,17 @@ fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
     for page_num in 1..=page_count {
         match doc.extract_text(&[page_num as u32]) {
             Ok(text) => {
+                let char_count = text.len();
+                let word_count = text.split_whitespace().count();
+                eprintln!("Page {} of {}: extracted {} chars, {} words. First 100 chars: {:?}",
+                         page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
+                         char_count, word_count,
+                         if text.len() > 100 { &text[..100] } else { &text });
                 pages.push((page_num, text));
             }
             Err(e) => {
                 // Log extraction failure and push empty string
-                eprintln!("Warning: Failed to extract text from page {} of {}: {}",
+                eprintln!("ERROR: Failed to extract text from page {} of {}: {}",
                          page_num, pdf_path.display(), e);
                 pages.push((page_num, String::new()));
             }
