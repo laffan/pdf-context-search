@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use lopdf::Document;
+use ferrules::Pdf;
 use rayon::prelude::*;
 use regex::Regex;
 use rusqlite::Connection;
@@ -280,33 +281,64 @@ fn extract_year(date: &Option<String>) -> Option<String> {
 }
 
 fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    let doc = Document::load(pdf_path)
-        .context(format!("Failed to load PDF: {}", pdf_path.display()))?;
+    // Try ferrules first (better text extraction)
+    match Pdf::new(pdf_path) {
+        Ok(pdf) => {
+            eprintln!("Using ferrules for text extraction: {}", pdf_path.file_name().unwrap_or_default().to_string_lossy());
+            let mut pages = Vec::new();
 
-    let mut pages = Vec::new();
-    let page_count = doc.get_pages().len();
+            for page_num in 0..pdf.page_count() {
+                match pdf.extract_text(&[page_num]) {
+                    Ok(text) => {
+                        let char_count = text.len();
+                        let word_count = text.split_whitespace().count();
+                        eprintln!("Page {} of {}: extracted {} chars, {} words. First 100 chars: {:?}",
+                                 page_num + 1, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
+                                 char_count, word_count,
+                                 if text.len() > 100 { &text[..100] } else { &text });
+                        pages.push((page_num + 1, text)); // page_num + 1 because ferrules is 0-indexed
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: ferrules failed to extract page {} of {}: {}",
+                                 page_num + 1, pdf_path.display(), e);
+                        pages.push((page_num + 1, String::new()));
+                    }
+                }
+            }
+            Ok(pages)
+        }
+        Err(e) => {
+            // Fallback to lopdf if ferrules fails
+            eprintln!("Warning: ferrules failed to load {}, falling back to lopdf: {}",
+                     pdf_path.display(), e);
 
-    for page_num in 1..=page_count {
-        match doc.extract_text(&[page_num as u32]) {
-            Ok(text) => {
-                let char_count = text.len();
-                let word_count = text.split_whitespace().count();
-                eprintln!("Page {} of {}: extracted {} chars, {} words. First 100 chars: {:?}",
-                         page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
-                         char_count, word_count,
-                         if text.len() > 100 { &text[..100] } else { &text });
-                pages.push((page_num, text));
+            let doc = Document::load(pdf_path)
+                .context(format!("Failed to load PDF with lopdf: {}", pdf_path.display()))?;
+
+            let mut pages = Vec::new();
+            let page_count = doc.get_pages().len();
+
+            for page_num in 1..=page_count {
+                match doc.extract_text(&[page_num as u32]) {
+                    Ok(text) => {
+                        let char_count = text.len();
+                        let word_count = text.split_whitespace().count();
+                        eprintln!("Page {} of {}: extracted {} chars, {} words (lopdf). First 100 chars: {:?}",
+                                 page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
+                                 char_count, word_count,
+                                 if text.len() > 100 { &text[..100] } else { &text });
+                        pages.push((page_num, text));
+                    }
+                    Err(e) => {
+                        eprintln!("ERROR: lopdf failed to extract text from page {} of {}: {}",
+                                 page_num, pdf_path.display(), e);
+                        pages.push((page_num, String::new()));
+                    }
+                }
             }
-            Err(e) => {
-                // Log extraction failure and push empty string
-                eprintln!("ERROR: Failed to extract text from page {} of {}: {}",
-                         page_num, pdf_path.display(), e);
-                pages.push((page_num, String::new()));
-            }
+            Ok(pages)
         }
     }
-
-    Ok(pages)
 }
 
 fn split_into_words(text: &str) -> Vec<String> {
