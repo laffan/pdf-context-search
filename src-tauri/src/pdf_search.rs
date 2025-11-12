@@ -280,90 +280,44 @@ fn extract_year(date: &Option<String>) -> Option<String> {
 }
 
 fn extract_text_from_pdf(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    // Try ferrules HTTP API first (better text extraction)
-    match extract_with_ferrules(pdf_path) {
-        Ok(pages) => {
-            eprintln!("Successfully extracted text using ferrules for: {}",
-                     pdf_path.file_name().unwrap_or_default().to_string_lossy());
-            Ok(pages)
-        }
-        Err(e) => {
-            // Fallback to lopdf if ferrules fails
-            eprintln!("Warning: ferrules extraction failed for {}, falling back to lopdf: {}",
-                     pdf_path.display(), e);
-
-            let doc = Document::load(pdf_path)
-                .context(format!("Failed to load PDF with lopdf: {}", pdf_path.display()))?;
-
-            let mut pages = Vec::new();
-            let page_count = doc.get_pages().len();
-
-            for page_num in 1..=page_count {
-                match doc.extract_text(&[page_num as u32]) {
-                    Ok(text) => {
-                        let char_count = text.len();
-                        let word_count = text.split_whitespace().count();
-                        eprintln!("Page {} of {}: extracted {} chars, {} words (lopdf). First 100 chars: {:?}",
-                                 page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
-                                 char_count, word_count,
-                                 if text.len() > 100 { &text[..100] } else { &text });
-                        pages.push((page_num, text));
-                    }
-                    Err(e) => {
-                        eprintln!("ERROR: lopdf failed to extract text from page {} of {}: {}",
-                                 page_num, pdf_path.display(), e);
-                        pages.push((page_num, String::new()));
-                    }
-                }
-            }
-            Ok(pages)
-        }
-    }
-}
-
-fn extract_with_ferrules(pdf_path: &Path) -> Result<Vec<(usize, String)>> {
-    use std::process::Command;
-
-    // First get page count using lopdf
     let doc = Document::load(pdf_path)
-        .context("Failed to load PDF to get page count")?;
-    let page_count = doc.get_pages().len();
-
-    eprintln!("Extracting {} pages from {} using ferrules CLI",
-             page_count, pdf_path.file_name().unwrap_or_default().to_string_lossy());
+        .context(format!("Failed to load PDF: {}", pdf_path.display()))?;
 
     let mut pages = Vec::new();
+    let page_count = doc.get_pages().len();
+    let mut successful_extractions = 0;
+    let mut total_chars = 0;
 
-    // Extract each page individually using ferrules --page-range
     for page_num in 1..=page_count {
-        let output = Command::new("ferrules")
-            .arg(pdf_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid path"))?)
-            .arg("--page-range")
-            .arg(page_num.to_string())
-            .arg("--md")  // Output as markdown
-            .output()
-            .context(format!("Failed to execute ferrules for page {}", page_num))?;
-
-        if !output.status.success() {
-            eprintln!("Warning: ferrules failed for page {} of {}: {}",
-                     page_num, pdf_path.display(),
-                     String::from_utf8_lossy(&output.stderr));
-            pages.push((page_num, String::new()));
-            continue;
+        match doc.extract_text(&[page_num as u32]) {
+            Ok(text) => {
+                let char_count = text.len();
+                if char_count > 0 {
+                    successful_extractions += 1;
+                    total_chars += char_count;
+                }
+                pages.push((page_num, text));
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to extract text from page {} of {}: {}",
+                         page_num, pdf_path.display(), e);
+                pages.push((page_num, String::new()));
+            }
         }
-
-        let text = String::from_utf8(output.stdout)
-            .unwrap_or_else(|_| String::new());
-
-        let char_count = text.len();
-        let word_count = text.split_whitespace().count();
-        eprintln!("Page {} of {}: extracted {} chars, {} words (ferrules). First 100 chars: {:?}",
-                 page_num, pdf_path.file_name().unwrap_or_default().to_string_lossy(),
-                 char_count, word_count,
-                 if text.len() > 100 { &text[..100] } else { &text });
-
-        pages.push((page_num, text));
     }
+
+    // Check if we extracted ANY text at all
+    if total_chars == 0 && page_count > 0 {
+        return Err(anyhow::anyhow!(
+            "Unable to extract text from this PDF. This may be due to: unsupported text encoding (common in Adobe PDFs), \
+             scanned images without OCR, or encryption. File: {}",
+            pdf_path.file_name().unwrap_or_default().to_string_lossy()
+        ));
+    }
+
+    eprintln!("Extracted text from {}/{} pages ({} total chars) in {}",
+             successful_extractions, page_count, total_chars,
+             pdf_path.file_name().unwrap_or_default().to_string_lossy());
 
     Ok(pages)
 }

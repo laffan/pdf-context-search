@@ -1,7 +1,5 @@
 mod pdf_search;
-mod ferrules_manager;
 
-use ferrules_manager::FerrulesManager;
 use pdf_search::{export_to_markdown, search_pdfs, search_single_pdf, list_pdfs, SearchMatch, SearchParams, PdfListItem, ListPdfsParams};
 use std::fs;
 
@@ -33,14 +31,6 @@ fn list_pdf_files(params: ListPdfsParams) -> Result<Vec<PdfListItem>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Check if ferrules is available
-    let ferrules = FerrulesManager::new();
-    if ferrules.is_available() {
-        eprintln!("Ferrules CLI detected - will use for PDF text extraction");
-    } else {
-        eprintln!("Ferrules CLI not found - will use lopdf fallback for PDF text extraction");
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
