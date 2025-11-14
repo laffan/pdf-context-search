@@ -144,14 +144,14 @@ export function renderFileGroup(filePath: string, fileMatches: SearchMatch[], is
           })()}
         </div>
         <div class="page-range-container" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}">
-          <span class="page-range-label">Search page <span class="page-range-start">1</span> to <span class="page-range-end">999</span></span>
+          <span class="page-range-label">Search pages <span class="page-range-start">1</span> to <span class="page-range-end">999</span></span>
           <div class="page-range-slider-wrapper">
             <div class="page-range-slider-track"></div>
             <div class="page-range-slider-fill"></div>
             <input type="range" class="page-range-slider page-range-start-slider" min="1" max="999" value="1" data-fileid="${fileId}" data-type="start" />
             <input type="range" class="page-range-slider page-range-end-slider" min="1" max="999" value="999" data-fileid="${fileId}" data-type="end" />
           </div>
-          <button class="page-range-search-btn" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}" title="Search with current filters">🔎</button>
+          <button class="page-range-search-btn" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}" title="Search with current filters">🔄</button>
         </div>
       </div>
       <div class="result-matches" id="matches-${fileId}">
