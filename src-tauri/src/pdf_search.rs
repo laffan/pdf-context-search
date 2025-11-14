@@ -68,6 +68,8 @@ pub struct SearchParams {
     pub directory: String,
     pub context_words: usize,
     pub zotero_path: Option<String>,
+    pub start_page: Option<usize>,
+    pub end_page: Option<usize>,
 }
 
 pub fn find_pdf_files(directory: &Path) -> Result<Vec<PathBuf>> {
@@ -444,8 +446,15 @@ fn search_pdf_with_queries(
     queries: &[QueryItem],
     context_words: usize,
     zotero_map: Option<&HashMap<String, ZoteroMetadata>>,
+    start_page: Option<usize>,
+    end_page: Option<usize>,
 ) -> Result<Vec<SearchMatch>> {
-    let pages = extract_text_from_pdf(pdf_path)?;
+    let mut pages = extract_text_from_pdf(pdf_path)?;
+
+    // Filter pages by page range if specified
+    if let (Some(start), Some(end)) = (start_page, end_page) {
+        pages.retain(|(page_num, _)| *page_num >= start && *page_num <= end);
+    }
 
     // Get filename and lookup Zotero metadata if available
     let file_name = pdf_path
@@ -559,6 +568,8 @@ pub fn search_pdfs(params: SearchParams) -> Result<Vec<SearchMatch>> {
                 &params.queries,
                 params.context_words,
                 zotero_map.as_ref(),
+                params.start_page,
+                params.end_page,
             ) {
                 Ok(matches) => Some(matches),
                 Err(_) => None,
@@ -602,6 +613,8 @@ pub fn search_single_pdf(params: SearchParams) -> Result<Vec<SearchMatch>> {
         &params.queries,
         params.context_words,
         zotero_map.as_ref(),
+        params.start_page,
+        params.end_page,
     )
 }
 

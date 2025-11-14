@@ -6,6 +6,9 @@ export let currentResults: SearchMatch[] = [];
 // Store per-PDF search queries (filePath -> query string)
 export const perPdfSearchQueries = new Map<string, string>();
 
+// Store per-PDF page ranges (filePath -> {start: number, end: number, totalPages: number})
+export const perPdfPageRanges = new Map<string, { start: number; end: number; totalPages: number }>();
+
 // Store pinned results (filePath -> {queries, matches})
 export const pinnedResults = new Map<string, PinnedResult>();
 

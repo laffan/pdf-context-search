@@ -7,6 +7,7 @@ import {
   resultsCount,
   exportLink,
   perPdfSearchQueries,
+  perPdfPageRanges,
   zoteroMode,
   zoteroPath
 } from '../../shared/data/state';
@@ -101,6 +102,11 @@ export function renderFileGroup(filePath: string, fileMatches: SearchMatch[], is
       </div>
       <div class="result-matches-filter" id="filter-${fileId}" data-filepath="${escapeHtml(filePath)}">
         <input type="text" class="result-matches-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
+        <div class="page-range-container" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}">
+          <span class="page-range-label">Search page <span class="page-range-start">1</span> to <span class="page-range-end">999</span></span>
+          <input type="range" class="page-range-slider page-range-start-slider" min="1" max="999" value="1" data-fileid="${fileId}" data-type="start" />
+          <input type="range" class="page-range-slider page-range-end-slider" min="1" max="999" value="999" data-fileid="${fileId}" data-type="end" />
+        </div>
         <div class="result-matches-query-filters">
           ${isPinned && originalQueries ? originalQueries.map((q, i) => {
             // For pinned results, count from the original matches array (not the combined one)
@@ -364,6 +370,12 @@ export function renderResults(matches: SearchMatch[]) {
               filterBar.style.setProperty('top', `${headerHeight - 2}px`);
             }
             filterBar.classList.add('visible');
+
+            // Initialize page range sliders
+            const filePath = filterBar.dataset.filepath;
+            if (filePath && fileId) {
+              initializePageRangeSliders(fileId, filePath);
+            }
           }
 
           // Determine which queries to use for highlighting
@@ -477,6 +489,7 @@ export function renderResults(matches: SearchMatch[]) {
             const filePath = searchInput.dataset.filepath;
             if (filePath) {
               perPdfSearchQueries.delete(filePath);
+              perPdfPageRanges.delete(filePath);
             }
             searchInput.value = '';
           }
@@ -545,6 +558,9 @@ export function renderResults(matches: SearchMatch[]) {
 
             // Search for this specific query to get match count
             try {
+              // Get page range if set
+              const pageRange = perPdfPageRanges.get(filePath);
+
               const customQueryParams: SearchParams = {
                 queries: [{
                   query: searchQuery,
@@ -555,6 +571,8 @@ export function renderResults(matches: SearchMatch[]) {
                 directory: filePath,
                 context_words: 100,
                 zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+                start_page: pageRange?.start,
+                end_page: pageRange?.end,
               };
 
               const customResults = await invoke<SearchMatch[]>('search_single_pdf_file', { params: customQueryParams });
@@ -612,11 +630,16 @@ export function renderResults(matches: SearchMatch[]) {
                 }
 
                 try {
+                  // Get page range if set
+                  const pageRange = perPdfPageRanges.get(filePath);
+
                   const queryParams: SearchParams = {
                     queries: [queryItem],
                     directory: filePath,
                     context_words: 100,
                     zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+                    start_page: pageRange?.start,
+                    end_page: pageRange?.end,
                   };
                   console.log(`Searching for additional query "${queryItem.query}"...`);
                   const results = await invoke<SearchMatch[]>('search_single_pdf_file', { params: queryParams });
@@ -793,6 +816,113 @@ export function renderResults(matches: SearchMatch[]) {
             }
           });
         }
+      }
+    });
+  });
+
+  // Set up event listeners for page range sliders
+  setupPageRangeSliderListeners();
+}
+
+// Initialize page range sliders with the correct max page number
+function initializePageRangeSliders(fileId: string, filePath: string) {
+  // Find max page number from current results or pinned results for this file
+  let maxPage = 1;
+  const fileMatches = currentResults.filter(m => m.file_path === filePath);
+  if (fileMatches.length > 0) {
+    maxPage = Math.max(...fileMatches.map(m => m.page_number));
+  } else {
+    const pinnedData = pinnedResults.get(filePath);
+    if (pinnedData) {
+      maxPage = Math.max(...pinnedData.matches.map(m => m.page_number));
+    }
+  }
+
+  // Get or initialize page range state
+  let pageRange = perPdfPageRanges.get(filePath);
+  if (!pageRange) {
+    pageRange = { start: 1, end: maxPage, totalPages: maxPage };
+    perPdfPageRanges.set(filePath, pageRange);
+  } else {
+    // Update totalPages if we found a higher page number
+    pageRange.totalPages = Math.max(pageRange.totalPages, maxPage);
+    pageRange.end = Math.min(pageRange.end, pageRange.totalPages);
+  }
+
+  // Update UI elements
+  const container = document.querySelector(`.page-range-container[data-fileid="${fileId}"]`);
+  if (container) {
+    const startLabel = container.querySelector('.page-range-start') as HTMLElement;
+    const endLabel = container.querySelector('.page-range-end') as HTMLElement;
+    const startSlider = container.querySelector('.page-range-start-slider') as HTMLInputElement;
+    const endSlider = container.querySelector('.page-range-end-slider') as HTMLInputElement;
+
+    if (startLabel && endLabel && startSlider && endSlider) {
+      // Set slider ranges
+      startSlider.min = '1';
+      startSlider.max = String(pageRange.totalPages);
+      startSlider.value = String(pageRange.start);
+
+      endSlider.min = '1';
+      endSlider.max = String(pageRange.totalPages);
+      endSlider.value = String(pageRange.end);
+
+      // Update labels
+      startLabel.textContent = String(pageRange.start);
+      endLabel.textContent = String(pageRange.end);
+    }
+  }
+}
+
+// Set up event listeners for page range sliders
+function setupPageRangeSliderListeners() {
+  document.querySelectorAll('.page-range-slider').forEach(slider => {
+    const inputSlider = slider as HTMLInputElement;
+
+    // Remove existing listeners by cloning
+    const newSlider = inputSlider.cloneNode(true) as HTMLInputElement;
+    inputSlider.parentNode?.replaceChild(newSlider, inputSlider);
+
+    newSlider.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      const fileId = target.dataset.fileid;
+      const type = target.dataset.type; // 'start' or 'end'
+      const value = parseInt(target.value);
+
+      if (!fileId) return;
+
+      const container = target.closest('.page-range-container');
+      if (!container) return;
+
+      const filePath = container.getAttribute('data-filepath');
+      if (!filePath) return;
+
+      const pageRange = perPdfPageRanges.get(filePath);
+      if (!pageRange) return;
+
+      const startLabel = container.querySelector('.page-range-start') as HTMLElement;
+      const endLabel = container.querySelector('.page-range-end') as HTMLElement;
+      const startSlider = container.querySelector('.page-range-start-slider') as HTMLInputElement;
+      const endSlider = container.querySelector('.page-range-end-slider') as HTMLInputElement;
+
+      if (type === 'start') {
+        // Ensure start doesn't exceed end
+        if (value > pageRange.end) {
+          pageRange.start = pageRange.end;
+          startSlider.value = String(pageRange.end);
+        } else {
+          pageRange.start = value;
+        }
+        startLabel.textContent = String(pageRange.start);
+      } else if (type === 'end') {
+        // Ensure end doesn't go below start
+        if (value < pageRange.start) {
+          pageRange.end = pageRange.start;
+          endSlider.value = String(pageRange.start);
+        } else {
+          pageRange.end = value;
+        }
+        endLabel.textContent = String(pageRange.end);
       }
     });
   });

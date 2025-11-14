@@ -30,6 +30,8 @@ export interface SearchParams {
   directory: string;
   context_words: number;
   zotero_path: string | null;
+  start_page?: number;
+  end_page?: number;
 }
 
 export interface SearchHistoryItem {
