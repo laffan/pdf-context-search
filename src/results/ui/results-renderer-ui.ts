@@ -102,11 +102,6 @@ export function renderFileGroup(filePath: string, fileMatches: SearchMatch[], is
       </div>
       <div class="result-matches-filter" id="filter-${fileId}" data-filepath="${escapeHtml(filePath)}">
         <input type="text" class="result-matches-search-input" placeholder="Search in this PDF..." data-filepath="${escapeHtml(filePath)}" data-fileid="${fileId}" />
-        <div class="page-range-container" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}">
-          <span class="page-range-label">Search page <span class="page-range-start">1</span> to <span class="page-range-end">999</span></span>
-          <input type="range" class="page-range-slider page-range-start-slider" min="1" max="999" value="1" data-fileid="${fileId}" data-type="start" />
-          <input type="range" class="page-range-slider page-range-end-slider" min="1" max="999" value="999" data-fileid="${fileId}" data-type="end" />
-        </div>
         <div class="result-matches-query-filters">
           ${isPinned && originalQueries ? originalQueries.map((q, i) => {
             // For pinned results, count from the original matches array (not the combined one)
@@ -147,6 +142,16 @@ export function renderFileGroup(filePath: string, fileMatches: SearchMatch[], is
             `;
             }).join('');
           })()}
+        </div>
+        <div class="page-range-container" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}">
+          <span class="page-range-label">Search page <span class="page-range-start">1</span> to <span class="page-range-end">999</span></span>
+          <div class="page-range-slider-wrapper">
+            <div class="page-range-slider-track"></div>
+            <div class="page-range-slider-fill"></div>
+            <input type="range" class="page-range-slider page-range-start-slider" min="1" max="999" value="1" data-fileid="${fileId}" data-type="start" />
+            <input type="range" class="page-range-slider page-range-end-slider" min="1" max="999" value="999" data-fileid="${fileId}" data-type="end" />
+          </div>
+          <button class="page-range-search-btn" data-fileid="${fileId}" data-filepath="${escapeHtml(filePath)}" title="Search with current filters">🔎</button>
         </div>
       </div>
       <div class="result-matches" id="matches-${fileId}">
@@ -870,6 +875,9 @@ function initializePageRangeSliders(fileId: string, filePath: string) {
       // Update labels
       startLabel.textContent = String(pageRange.start);
       endLabel.textContent = String(pageRange.end);
+
+      // Initialize the fill bar
+      updateSliderFill(container as HTMLElement, pageRange.start, pageRange.end, pageRange.totalPages);
     }
   }
 }
@@ -924,6 +932,166 @@ function setupPageRangeSliderListeners() {
         }
         endLabel.textContent = String(pageRange.end);
       }
+
+      // Update the fill bar
+      updateSliderFill(container as HTMLElement, pageRange.start, pageRange.end, pageRange.totalPages);
     });
   });
+
+  // Set up event listeners for search buttons
+  document.querySelectorAll('.page-range-search-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const button = btn as HTMLButtonElement;
+      const fileId = button.dataset.fileid;
+      const filePath = button.dataset.filepath;
+
+      if (!fileId || !filePath) return;
+
+      const filterBar = document.getElementById(`filter-${fileId}`);
+      const matchesContainer = document.getElementById(`matches-${fileId}`);
+      if (!filterBar || !matchesContainer) return;
+
+      // Show loading state
+      matchesContainer.innerHTML = '<div class="page-preview-loading">Searching...</div>';
+
+      // Get all checked queries
+      const checkedQueries: QueryItem[] = [];
+      filterBar.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+        const checkbox = cb as HTMLInputElement;
+        const query = checkbox.dataset.query;
+        const color = checkbox.dataset.color || '#ffff00';
+        if (query) {
+          checkedQueries.push({
+            query: query,
+            use_regex: false,
+            query_type: 'parallel',
+            color: color
+          });
+        }
+      });
+
+      // If no queries are checked, show a message
+      if (checkedQueries.length === 0) {
+        matchesContainer.innerHTML = '<div class="page-preview-loading">Please check at least one query filter to search.</div>';
+        return;
+      }
+
+      try {
+        const pageRange = perPdfPageRanges.get(filePath);
+
+        // Search for all checked queries
+        let allResults: SearchMatch[] = [];
+        for (const queryItem of checkedQueries) {
+          const queryParams: SearchParams = {
+            queries: [queryItem],
+            directory: filePath,
+            context_words: 100,
+            zotero_path: zoteroMode.checked ? (zoteroPath.textContent || '').trim() || null : null,
+            start_page: pageRange?.start,
+            end_page: pageRange?.end,
+          };
+          const results = await invoke<SearchMatch[]>('search_single_pdf_file', { params: queryParams });
+          allResults = allResults.concat(results);
+        }
+
+        // Remove duplicate pages
+        const pageSet = new Set<number>();
+        const mergedResults: SearchMatch[] = [];
+        allResults.forEach(result => {
+          if (!pageSet.has(result.page_number)) {
+            pageSet.add(result.page_number);
+            mergedResults.push(result);
+          }
+        });
+
+        // Sort by page number
+        mergedResults.sort((a, b) => a.page_number - b.page_number);
+
+        // Re-render this PDF's matches
+        if (mergedResults.length > 0) {
+          matchesContainer.innerHTML = '';
+
+          // Group by page
+          const pageGroupsLocal = new Map<number, SearchMatch[]>();
+          mergedResults.forEach(match => {
+            if (!pageGroupsLocal.has(match.page_number)) {
+              pageGroupsLocal.set(match.page_number, []);
+            }
+            pageGroupsLocal.get(match.page_number)!.push(match);
+          });
+
+          pageGroupsLocal.forEach((pageMatches, pageNumber) => {
+            const pageId = `page-${fileId}-${pageNumber}`;
+            const firstMatch = pageMatches[0];
+            const zoteroMetadata = firstMatch.zotero_metadata;
+
+            const pageHeader = zoteroMetadata && zoteroMetadata.pdf_attachment_key
+              ? `<a href="#" class="page-link" data-attachment-key="${escapeHtml(zoteroMetadata.pdf_attachment_key)}" data-page="${pageNumber}">Page ${pageNumber}</a> (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`
+              : `Page ${pageNumber} (${pageMatches.length} ${pageMatches.length === 1 ? 'match' : 'matches'})`;
+
+            const matchDiv = document.createElement('div');
+            matchDiv.className = 'result-match';
+            matchDiv.innerHTML = `
+              <div class="result-match-header">${pageHeader}</div>
+              <div class="page-preview" id="${pageId}">
+                <div class="page-preview-loading">Loading page preview...</div>
+              </div>
+            `;
+
+            matchesContainer.appendChild(matchDiv);
+          });
+
+          // Re-setup page link event listeners
+          matchesContainer.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const attachmentKey = (link as HTMLAnchorElement).dataset.attachmentKey;
+              const page = (link as HTMLAnchorElement).dataset.page;
+              if (attachmentKey && page) {
+                openInZotero(attachmentKey, parseInt(page), link as HTMLAnchorElement);
+              }
+            });
+          });
+
+          // Load all page images
+          const pageElements = matchesContainer.querySelectorAll('.page-preview');
+          pageElements.forEach((pageElement) => {
+            const pageId = pageElement.id;
+            const match = pageId.match(/page-(.+)-(\d+)$/);
+            if (match) {
+              const pageNumber = parseInt(match[2]);
+              const fileMatch = mergedResults.find(m => m.page_number === pageNumber);
+              loadPageImage(filePath, pageNumber, checkedQueries, fileMatch)
+                .then(element => {
+                  pageElement.innerHTML = '';
+                  pageElement.appendChild(element);
+                })
+                .catch(() => {
+                  pageElement.innerHTML = `<div class="page-preview-error">Failed to load page preview</div>`;
+                });
+            }
+          });
+        } else {
+          matchesContainer.innerHTML = '<div class="page-preview-loading">No matches found in the selected page range.</div>';
+        }
+      } catch (error) {
+        console.error('Page range search failed:', error);
+        matchesContainer.innerHTML = `<div class="page-preview-error">Search failed: ${error}</div>`;
+      }
+    });
+  });
+}
+
+// Update the fill bar between slider handles
+function updateSliderFill(container: HTMLElement, start: number, end: number, total: number) {
+  const fillBar = container.querySelector('.page-range-slider-fill') as HTMLElement;
+  if (!fillBar) return;
+
+  const startPercent = ((start - 1) / (total - 1)) * 100;
+  const endPercent = ((end - 1) / (total - 1)) * 100;
+
+  fillBar.style.left = `${startPercent}%`;
+  fillBar.style.width = `${endPercent - startPercent}%`;
 }
